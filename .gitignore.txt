@@ -10,3 +10,6 @@ eda/
 
 #meeting files
 meetings/
+
+#ignore data files
+*.csv
