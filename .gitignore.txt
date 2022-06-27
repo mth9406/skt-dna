@@ -1,0 +1,12 @@
+#papers
+papers/
+
+#data
+data/
+!data/*.py
+
+#eda
+eda/
+
+#meeting files
+meetings/
