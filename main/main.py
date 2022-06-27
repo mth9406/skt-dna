@@ -27,6 +27,8 @@ parser.add_argument('--val', type= float, default= 0.2,
                 help= 'the ratio of validation data to the original data')
 parser.add_argument('--standardize', action= 'store_true', 
                 help= 'standardize the inputs if it is true.')
+parser.add_argument('--lag', type= int, default= 1, 
+                help= 'time-lag (default: 1)')
 
 # Training options
 parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
