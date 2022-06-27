@@ -89,18 +89,18 @@ def main(args):
 
     # define training, validation, test datasets and their dataloaders respectively 
     train_data, valid_data, test_data \
-        = TimeSeriesDataset(*data['train']),\
-          TimeSeriesDataset(*data['valid']),\
-          TimeSeriesDataset(*data['test'])
+        = TimeSeriesDataset(*data['train'], lag= args.lag),\
+          TimeSeriesDataset(*data['valid'], lag= args.lag),\
+          TimeSeriesDataset(*data['test'], lag= args.lag)
     train_loader, valid_loader, test_loader \
-        = DataLoader(train_data, batch_size = args.batch_size, shuffle = True),\
-            DataLoader(valid_data, batch_size = args.batch_size, shuffle = True),\
+        = DataLoader(train_data, batch_size = args.batch_size, shuffle = False),\
+            DataLoader(valid_data, batch_size = args.batch_size, shuffle = False),\
             DataLoader(test_data, batch_size = args.batch_size, shuffle = False)
 
     print("Loading data done!")
 
     # model
-    if args.model_type == 'si':
+    if args.model_type == 'proto':
         model = None
     else:
         print("The model is yet to be implemented.")
