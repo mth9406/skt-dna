@@ -73,10 +73,6 @@ def train(args,
         'valid_loss':[]
     }
 
-    kl_loss = None
-    if args.model_type == 'vibi': 
-        kl_loss = bnn.BKLLoss(reduction='mean', last_layer_only=False)
-
     num_batches = len(train_loader)
     print('Start training...')
     for epoch in range(args.epoch):
@@ -91,16 +87,9 @@ def train(args,
             # feed forward
             with torch.set_grad_enabled(True):
                 out = model(x)
-                loss_imp = get_loss_imp(x['input'], out['imputation'], x['mask'])
                 loss = criterion(out['preds'], x['label'])
-                loss += args.imp_loss_penalty * loss_imp
                 if out['regularization_loss'] is not None: 
-                    loss += args.imp_loss_penalty * out['regularization_loss']
-                if kl_loss is not None: 
-                    kl = kl_loss(model)[0]
-                    # print(kl)
-                    # print(loss)
-                    loss += args.kl_weight * kl
+                    loss += args.reg_loss_penalty * out['regularization_loss']
             
             # backward 
             model.zero_grad()
@@ -125,14 +114,9 @@ def train(args,
             loss = 0
             with torch.no_grad():
                 out = model(x)
-                loss_imp = get_loss_imp(x['input'], out['imputation'], x['mask'])
                 loss = criterion(out['preds'], x['label'])
-                loss += args.imp_loss_penalty * loss_imp
                 if out['regularization_loss'] is not None: 
-                    loss += args.imp_loss_penalty * out['regularization_loss']
-                if kl_loss is not None: 
-                    kl = kl_loss(model)[0]
-                    loss += args.kl_weight * kl
+                    loss += args.reg_loss_penalty * out['regularization_loss']
             valid_loss += loss.detach().cpu().item()
         
         # save current loss values
@@ -165,10 +149,8 @@ def test_regr(args,
           device
           ):
     
-    te_loss_imp = 0
     te_loss_preds = 0
     te_loss_tot = 0
-    te_imp_pred_loss = 0.
     te_r2 = 0
     te_mae = 0
     te_mse = 0
@@ -177,26 +159,19 @@ def test_regr(args,
         x['input'], x['mask'], x['label'] \
             = x['input'].to(device), x['mask'].to(device), x['label'].to(device)
         
-        x['complete_input'] = x['complete_input'].to(device) if x['complete_input'] is not None\
-            else None 
-        
         model.eval()
         loss = 0
         with torch.no_grad():
             out = model(x)
-            loss_imp = get_loss_imp(x['input'], out['imputation'], x['mask'])
             loss = criterion(out['preds'], x['label'])
             loss_reg = 0. 
-            imp_pred_loss = 0.
             if out['regularization_loss'] is not None: 
-                loss_reg += args.imp_loss_penalty * out['regularization_loss']
-            tot_loss = loss + args.imp_loss_penalty * loss_imp + loss_reg
-            if x['complete_input'] is not None: 
-                imp_pred_loss += get_loss_imp(x['complete_input'], out['imputation'], 1-x['mask'])        
-        te_loss_imp += loss_imp.detach().cpu().numpy()
+                loss_reg += args.reg_loss_penalty * out['regularization_loss']
+            tot_loss = loss + loss_reg
+      
         te_loss_preds += loss.detach().cpu().numpy()
         te_loss_tot += tot_loss.detach().cpu().numpy()
-        te_imp_pred_loss += imp_pred_loss.detach().cpu().item()
+
 
         te_r2 += r2_score(out['preds'].detach().cpu().numpy(), x['label'].detach().cpu().numpy())
         te_mae += mean_absolute_error(out['preds'].detach().cpu().numpy(), x['label'].detach().cpu().numpy()) 
@@ -205,7 +180,6 @@ def test_regr(args,
     te_loss_imp = te_loss_imp/len(test_loader)
     te_loss_preds = te_loss_preds/len(test_loader)
     te_loss_tot = te_loss_tot/len(test_loader)
-    te_imp_pred_loss = te_imp_pred_loss/len(test_loader)
     te_r2 = te_r2/len(test_loader)
     te_mae = te_mae/len(test_loader)
     te_mse = te_mse/len(test_loader)
@@ -213,7 +187,6 @@ def test_regr(args,
     print(f"imputation loss: {te_loss_imp:.2f}")
     print(f"prediction loss: {te_loss_preds:.2f}")
     print(f"total loss: {te_loss_tot:.2f}")
-    print(f"test imputation prediction loss {te_imp_pred_loss:.2f}")
     print(f"r2: {te_r2:.2f}")
     print(f"mae: {te_mae:.2f}")
     print(f"mse: {te_mse:.2f}")
@@ -222,8 +195,7 @@ def test_regr(args,
     perf = {
         'r2': te_r2,
         'mae': te_mae,
-        'mse': te_mse,
-        'imp_error':te_imp_pred_loss 
+        'mse': te_mse
     }
 
     return perf 

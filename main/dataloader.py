@@ -59,9 +59,8 @@ def load_skt(args):
     _________
     dictionary containig:
     X_train, X_valid, M_train, 
-    y_train, y_valid, M_valid, 
     M_train, M_vald, M_test    
-    (torch.FloatTensor for both X, M and y)
+    (torch.FloatTensor for both X and M)
     """
     assert args.tr + args.val < 1, "No remaining portion for the test... please let args.tr + args.val < 1"
 
@@ -104,7 +103,8 @@ def load_skt(args):
     X_train, X_valid, X_test\
         = X[:, :start_idx_val, :], X[:, start_idx_val:start_idx_te, :], X[:, start_idx_te:, :]
 
-    M_train, M_valid, M_test = None, None, None
+    M_train, M_valid, M_test\
+         = M[:, :start_idx_val, :], M[:, start_idx_val:start_idx_te, :], M[:, start_idx_te:, :]
 
     return {
         "train": [X_train, M_train],
