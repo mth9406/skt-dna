@@ -125,13 +125,8 @@ class AdjConstructor(nn.Module):
 class InformationPropagtionLayer(nn.Module): 
     """Information Propagtion Layer
     """
-    def __init__(self, in_features, out_features, **kwargs): 
+    def __init__(self): 
         super().__init__() 
-        # self.conv_outer = nn.Conv2d()
-        self.conv_inter = nn.Conv2d(in_features, out_features, 1, groups= out_features, **kwargs)
-        # self.fc_out = nn.Conv2d(out_features, out_features, 1,1,0,1,1, **kwargs) # feature selector
-        # self.beta = nn.Parameter(torch.full((1,), 0.5))
-        self.in_features, self.out_features = in_features, out_features 
 
     def forward(self, x, h_in, A_inter, beta= 0.5): 
         """Feed forward
@@ -145,7 +140,7 @@ class InformationPropagtionLayer(nn.Module):
         """
         # obtain normalized adjacency matrices
         A_i = self.norm_adj(A_inter)
-        h = torch.matmul(A_i, self.conv_inter(x)) # bs, c, n, l
+        h = torch.matmul(A_i, x) # bs, c, n, l
         # h = self.beta * x + (1-self.beta) * h
         return beta * h_in + (1-beta) * h
         
@@ -177,27 +172,31 @@ class GraphConvolutionModule(nn.Module):
     """
     def __init__(self, in_features, out_features, k, **kwargs): 
         super().__init__() 
-        
-        for i in range(k):
-            setattr(self, f'gcl{i}', InformationPropagtionLayer(in_features, out_features))
+        self.conv_inter = nn.Conv2d(in_features, out_features, 1, groups= out_features, **kwargs)
 
-        for i in range(k): 
+        for i in range(1, k+1):
+            setattr(self, f'gcl{i}', InformationPropagtionLayer())
+
+        for i in range(k+1): 
             setattr(self, f'info_select{i}', nn.Conv2d(out_features, out_features, 1,1,0,1,1, **kwargs))
         
         self.in_features, self.out_features, self.k\
             = in_features, out_features, k
     
-    def forward(self, x, A):
+    def forward(self, x, A, beta= 0.5):
         A_tilde = self.norm_adj(A)
-        gcl = getattr(self, 'gcl0')
-        hiddens = []
-        hiddens.append(gcl(x, x, A_tilde))
-        for i in range(1, self.k): 
+        x = self.conv_inter(x)
+        hiddens = [x]
+        gcl = getattr(self, 'gcl1')
+        hiddens.append(gcl(hiddens[-1], x, A_tilde))
+        for i in range(2, self.k+1): 
             gcl = getattr(self, f'gcl{i}')
             A_tilde = torch.bmm(A_tilde.permute(0,2,1), A)
-            hiddens.append(gcl(hiddens[-1], x, A_tilde))
-        
-        
+            hiddens.append(gcl(hiddens[-1], x, A_tilde, beta= beta))
+        out = 0
+        for i in range(self.k+1):
+            info_select = getattr(self, f'info_select{i}')
+            out += info_select(hiddens[i])
         return out 
 
     def norm_adj(self, A): 
