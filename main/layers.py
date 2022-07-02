@@ -88,8 +88,8 @@ class TemporalConvolutionModule(nn.Module):
         return out        
 
 # graph learning layer 
-class GraphLearningLayer(nn.Module): 
-    """Graph learning layer
+class AdjConstructor(nn.Module): 
+    """Constructs an adjacency matrix
 
     n_nodes: the number of nodes (node= cell)
     embedding_dim: dimension of the embedding vector
@@ -113,10 +113,104 @@ class GraphLearningLayer(nn.Module):
         adj_mat = F.relu(torch.tanh(self.alpha*(emb1@emb2.T - emb2@emb1.T))) # adjacency matrix
         mask = torch.zeros(idx.size(0), idx.size(0)).to(idx.device) 
         mask.fill_(float('0'))
-        s1, t1 = (adj_mat + torch.rand_like(adj_mat)*0.01).topk(self.k, 1) # values, indices
+        if self.training:
+            s1, t1 = (adj_mat + torch.rand_like(adj_mat)*0.01).topk(self.k, 1) # values, indices
+        else: 
+            s1, t1 = adj_mat.topk(self.k, 1)
         mask.scatter_(1, t1, s1.fill_(1))
         adj_mat = adj_mat * mask 
         return adj_mat
 
 # graph convolution layer 
+class InformationPropagtionLayer(nn.Module): 
+    """Information Propagtion Layer
+    """
+    def __init__(self, in_features, out_features, **kwargs): 
+        super().__init__() 
+        # self.conv_outer = nn.Conv2d()
+        self.conv_inter = nn.Conv2d(in_features, out_features, 1, groups= out_features, **kwargs)
+        # self.fc_out = nn.Conv2d(out_features, out_features, 1,1,0,1,1, **kwargs) # feature selector
+        # self.beta = nn.Parameter(torch.full((1,), 0.5))
+        self.in_features, self.out_features = in_features, out_features 
 
+    def forward(self, x, h_in, A_inter, beta= 0.5): 
+        """Feed forward
+        x : FloatTensor
+            input time series 
+        A_inter : C x N x N 
+            adjacency matrix (inter time series)
+        A_outer : C x C 
+            adjacency matrix (outer time series)
+            yet to be used...
+        """
+        # obtain normalized adjacency matrices
+        A_i = self.norm_adj(A_inter)
+        h = torch.matmul(A_i, self.conv_inter(x)) # bs, c, n, l
+        # h = self.beta * x + (1-self.beta) * h
+        return beta * h_in + (1-beta) * h
+        
+    def norm_adj(self, A): 
+        """Obtains normalized version of an adjacency matrix
+        """
+        assert len(A.shape) == 3 or len(A.shape) == 2, "Improper shape of an adjacency matrix, must be either C x C or C x N x N"
+        with torch.no_grad():
+            if len(A.shape) == 3: 
+                eyes = torch.stack([torch.eye(A.shape[1]) for _ in range(A.shape[0])]).to(device= A.device)
+                D_tilde_inv = torch.diag_embed(1/(1. + torch.sum(A, dim=2))) # C x N x N 
+                A_tilde = D_tilde_inv @ (A + eyes)
+            else: 
+                eye = torch.eye(A.shape[1]).to(A.device)
+                D_tilde_inv = torch.diag(1/(1.+torch.sum(A, dim=1)))
+                A_tilde = D_tilde_inv @ (A + eye)
+        return A_tilde 
+
+# graph convolution module 
+class GraphConvolutionModule(nn.Module): 
+    """Graph convolution module
+    Args:
+    in_features : int
+        dimension of the input tensor
+    out_features : int
+        dimension of the output tensor 
+    k : int
+        the number of layers
+    """
+    def __init__(self, in_features, out_features, k, **kwargs): 
+        super().__init__() 
+        
+        for i in range(k):
+            setattr(self, f'gcl{i}', InformationPropagtionLayer(in_features, out_features))
+
+        for i in range(k): 
+            setattr(self, f'info_select{i}', nn.Conv2d(out_features, out_features, 1,1,0,1,1, **kwargs))
+        
+        self.in_features, self.out_features, self.k\
+            = in_features, out_features, k
+    
+    def forward(self, x, A):
+        A_tilde = self.norm_adj(A)
+        gcl = getattr(self, 'gcl0')
+        hiddens = []
+        hiddens.append(gcl(x, x, A_tilde))
+        for i in range(1, self.k): 
+            gcl = getattr(self, f'gcl{i}')
+            A_tilde = torch.bmm(A_tilde.permute(0,2,1), A)
+            hiddens.append(gcl(hiddens[-1], x, A_tilde))
+        
+        
+        return out 
+
+    def norm_adj(self, A): 
+        """Obtains normalized version of an adjacency matrix
+        """
+        assert len(A.shape) == 3 or len(A.shape) == 2, "Improper shape of an adjacency matrix, must be either C x C or C x N x N"
+        with torch.no_grad():
+            if len(A.shape) == 3: 
+                eyes = torch.stack([torch.eye(A.shape[1]) for _ in range(A.shape[0])]).to(device= A.device)
+                D_tilde_inv = torch.diag_embed(1/(1. + torch.sum(A, dim=2))) # C x N x N 
+                A_tilde = D_tilde_inv @ (A + eyes)
+            else: 
+                eye = torch.eye(A.shape[1]).to(A.device)
+                D_tilde_inv = torch.diag(1/(1.+torch.sum(A, dim=1)))
+                A_tilde = D_tilde_inv @ (A + eye)
+        return A_tilde 
