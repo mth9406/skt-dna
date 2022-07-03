@@ -22,26 +22,26 @@ class TimeSeriesDataset(Dataset):
         super().__init__()
         # X: (5363, 2293, 10)
         # M: (5363, 2293, 10)
-        self.X, self.M, self.D = X, M, D
+        self.X, self.M, self.D = X.permute(0, 2, 1), M.permute(0, 2, 1), D.permute(0, 2, 1)
         self.lag = lag
 
     def __getitem__(self, index):
         if self.D is None: 
             return {
-                "input": self.X[:, index:index+self.lag, :],
-                "mask": self.M[:, index:index+self.lag, :],
-                "label": self.X[:, index+self.lag:index+self.lag+1, :]
+                "input": self.X[:, :, index:index+self.lag],
+                "mask": self.M[:, :, index:index+self.lag],
+                "label": self.X[:, :, index+self.lag:index+self.lag+1]
             }
         else: 
             return {
-                "input": self.X[:, index:index+self.lag, :],
-                "mask": self.M[:, index:index+self.lag, :],
-                "label": self.X[:, index+self.lag:index+self.lag+1, :],
+                "input": self.X[:, :, index:index+self.lag],
+                "mask": self.M[:, :, index:index+self.lag],
+                "label": self.X[:, :, index+self.lag:index+self.lag+1],
                 "time_interval":self.D[index]               
             }
 
     def __len__(self): 
-        return len(self.X[0])-self.lag - 1
+        return self.X.shape[-1]-self.lag - 1
 
 def load_skt(args): 
     """
@@ -66,7 +66,6 @@ def load_skt(args):
 
     # data_path 
     files = [os.path.join(args.data_path, f) for f in os.listdir(args.data_path)]
-
 
     # (1) load data and generate mask...
     # {1, 0} 1 for missing, 0 for not missing
@@ -94,6 +93,10 @@ def load_skt(args):
     # --> should improve the imputation strategy....
     X = torch.nan_to_num(X, nan= 0.0)
     M = torch.FloatTensor(M)
+
+    num_heteros, num_obs, num_ts = X.shape
+    args.num_heteros = num_heteros
+    args.num_ts = num_ts 
 
     # (4) train-validation-test split
     start_idx_val = int(X.shape[1]*args.tr)

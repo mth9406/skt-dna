@@ -1,4 +1,5 @@
 from this import d
+from pyrsistent import s
 import torch
 from torch import nn 
 from torch.nn import functional as F
@@ -30,13 +31,34 @@ def make_input_n_mask_pairs(x):
     pair[:, 1::2, ...] = x['mask']
     return pair
 
+class ResidualAdd(nn.Module):
+    """Residual connection
+
+    # Arguments
+    ___________
+    fn : sub-class of nn.Module
+    
+    # Returns
+    _________
+    returns residual connection 
+    """
+    def __init__(self, fn):
+        super().__init__()
+        self.fn = fn
+
+    def forward(self, x, **kwargs):
+        res = x
+        x = self.fn(x, **kwargs)
+        x += res
+        return x
+
 # projection layer
 class ProjectionConv1x1Layer(nn.Module): 
     """Projection layer using conv1x1
     """
-    def __init__(self, in_channels, out_channels, groups, **kargs): 
+    def __init__(self, in_channels, out_channels, groups, **kwargs): 
         super().__init__()     
-        self.projection = nn.Conv2d(in_channels, out_channels, 1, 1, 0, 1, groups= groups, **kargs)
+        self.projection = nn.Conv2d(in_channels, out_channels, 1, 1, 0, 1, groups= groups, **kwargs)
         self.in_channels, self.out_channels = in_channels, out_channels 
 
     def forward(self, pair): 
@@ -52,12 +74,12 @@ class ProjectionConv1x1Layer(nn.Module):
 class DilatedInceptionLayer(nn.Module):
     """Dilated inception layer
     """
-    def __init__(self, in_channels, out_channels, **kargs):
+    def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__()
-        self.branch1x1 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,1), padding= (0, 0), dilation= 1, **kargs)
-        self.branch1x3 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 1), dilation= 1, **kargs)
-        self.branch1x5 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 2), dilation= 2, **kargs)
-        self.branch1x7 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 3), dilation= 3, **kargs)
+        self.branch1x1 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,1), padding= (0, 0), groups= in_channels, dilation= 1, **kwargs)
+        self.branch1x3 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 1), groups= in_channels, dilation= 1, **kwargs)
+        self.branch1x5 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 2), groups= in_channels, dilation= 2, **kwargs)
+        self.branch1x7 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 3), groups= in_channels, dilation= 3, **kwargs)
 
         self.in_channels, self.out_channels = in_channels, out_channels
 
@@ -74,18 +96,19 @@ class DilatedInceptionLayer(nn.Module):
 class TemporalConvolutionModule(nn.Module): 
     """TemporalConvolutionModule
     """
-    def __init__(self, in_channels, out_channels, **kargs): 
+    def __init__(self, in_channels, out_channels, num_heteros, **kwargs): 
         super().__init__()
-        self.dil_filter = DilatedInceptionLayer(in_channels, out_channels, **kargs)
-        self.dil_gate = DilatedInceptionLayer(in_channels, out_channels, **kargs) 
-        
+        self.dil_filter = DilatedInceptionLayer(in_channels, out_channels, **kwargs)
+        self.dil_gate = DilatedInceptionLayer(in_channels, out_channels, **kwargs) 
+        self.conv_inter = nn.Conv2d(4*in_channels, in_channels, 1, groups= num_heteros, **kwargs)
         self.in_channels, self.out_channels = in_channels, out_channels  
+        self.num_heteros = num_heteros
 
     def forward(self, x): 
         out_filter = torch.tanh(self.dil_filter(x))
         out_gate = torch.sigmoid(self.dil_gate(x)) 
         out = out_filter*out_gate
-        return out        
+        return self.conv_inter(out)        
 
 # graph learning layer 
 class AdjConstructor(nn.Module): 
@@ -94,14 +117,13 @@ class AdjConstructor(nn.Module):
     n_nodes: the number of nodes (node= cell)
     embedding_dim: dimension of the embedding vector
     """
-    def __init__(self, n_nodes, embedding_dim, k, alpha= 3.): 
+    def __init__(self, n_nodes, embedding_dim, alpha= 3.): 
         super().__init__()
         self.emb1 = nn.Embedding(n_nodes, embedding_dim=embedding_dim)
         self.emb2 = nn.Embedding(n_nodes, embedding_dim=embedding_dim)
         self.theta1 = nn.Linear(embedding_dim, embedding_dim)
         self.theta2 = nn.Linear(embedding_dim, embedding_dim)
         self.alpha = alpha # controls saturation rate of tanh: activation function.
-        self.k = k
 
     def forward(self, idx):
         emb1 = self.emb1(idx) 
@@ -172,7 +194,7 @@ class GraphConvolutionModule(nn.Module):
     """
     def __init__(self, in_features, out_features, k, **kwargs): 
         super().__init__() 
-        self.conv_inter = nn.Conv2d(in_features, out_features, 1, groups= out_features, **kwargs)
+        # self.conv_inter = nn.Conv2d(in_features, out_features, 1, groups= out_features, **kwargs)
 
         for i in range(1, k+1):
             setattr(self, f'gcl{i}', InformationPropagtionLayer())
@@ -185,7 +207,7 @@ class GraphConvolutionModule(nn.Module):
     
     def forward(self, x, A, beta= 0.5):
         A_tilde = self.norm_adj(A)
-        x = self.conv_inter(x)
+        # x = self.conv_inter(x)
         hiddens = [x]
         gcl = getattr(self, 'gcl1')
         hiddens.append(gcl(hiddens[-1], x, A_tilde))

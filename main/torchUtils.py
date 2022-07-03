@@ -88,8 +88,8 @@ def train(args,
             with torch.set_grad_enabled(True):
                 out = model(x)
                 loss = criterion(out['preds'], x['label'])
-                if out['regularization_loss'] is not None: 
-                    loss += args.reg_loss_penalty * out['regularization_loss']
+                # if out['regularization_loss'] is not None: 
+                #     loss += args.reg_loss_penalty * out['regularization_loss']
             
             # backward 
             model.zero_grad()
@@ -115,8 +115,8 @@ def train(args,
             with torch.no_grad():
                 out = model(x)
                 loss = criterion(out['preds'], x['label'])
-                if out['regularization_loss'] is not None: 
-                    loss += args.reg_loss_penalty * out['regularization_loss']
+                # if out['regularization_loss'] is not None: 
+                #     loss += args.reg_loss_penalty * out['regularization_loss']
             valid_loss += loss.detach().cpu().item()
         
         # save current loss values
@@ -165,8 +165,8 @@ def test_regr(args,
             out = model(x)
             loss = criterion(out['preds'], x['label'])
             loss_reg = 0. 
-            if out['regularization_loss'] is not None: 
-                loss_reg += args.reg_loss_penalty * out['regularization_loss']
+            # if out['regularization_loss'] is not None: 
+            #     loss_reg += args.reg_loss_penalty * out['regularization_loss']
             tot_loss = loss + loss_reg
       
         te_loss_preds += loss.detach().cpu().numpy()

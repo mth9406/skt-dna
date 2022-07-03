@@ -3,7 +3,6 @@ import sys
 import argparse
 
 import torch
-import torchbnn as bnn
 import numpy as np
 
 import torch
@@ -48,10 +47,14 @@ parser.add_argument('--reg_loss_penalty', type= float, default= 1e-2,
 # model options
 parser.add_argument('--model_path', type= str, default= './data/skt/model',
                     help= 'a path to (save) the model')
-parser.add_argument('--input_size', type= int, default= 18, 
-                    help= 'the size of dimension')
-parser.add_argument('--drop_p', type= float, default= 0.5,
-                    help= 'dropout ratio (default= 0.5)')
+parser.add_argument('--num_blocks', type= int, default= 3, 
+                    help= 'the number of the HeteroBlocks (default= 3)')
+parser.add_argument('--k', type= int, default= 2,
+                help= 'the number of layers at every GC-Module (default= 2)')
+parser.add_argument('--embedding_dim', type= int, default= 128,
+                help= 'the size of embedding dimesion in the graph-learning layer (default= 128)')
+parser.add_argument('--alpha', type= float, default= 3.,
+                help= 'controls saturation rate of tanh: activation function in the graph-learning layer (default= 3.0)')      
 
 # To test
 parser.add_argument('--test', action='store_true', help='test')
@@ -101,7 +104,16 @@ def main(args):
 
     # model
     if args.model_type == 'proto':
-        model = None
+        model = HeteroMTGNN(
+            num_heteros= args.num_heteros,
+            num_ts= args.num_ts,  
+            time_lags= args.lag, 
+            num_blocks= args.num_blocks, 
+            k= args.k, 
+            embedding_dim= args.embedding_dim,
+            device= device,
+            alpha= args.alpha
+        )
     else:
         print("The model is yet to be implemented.")
         sys.exit()
