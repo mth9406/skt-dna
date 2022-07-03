@@ -20,9 +20,13 @@ class TimeSeriesDataset(Dataset):
     """
     def __init__(self, X, M, D= None, lag= 1):
         super().__init__()
-        # X: (5363, 2293, 10)
-        # M: (5363, 2293, 10)
-        self.X, self.M, self.D = X.permute(0, 2, 1), M.permute(0, 2, 1), D.permute(0, 2, 1)
+        # X: (5363, 2293, 10) -> (5363, 10, 2293)
+        # M: (5363, 2293, 10) -> (5363, 10, 2293)
+        self.X, self.M = X.permute(0, 2, 1), M.permute(0, 2, 1)
+        if D is not None: 
+            self.D = D.permute(0, 2, 1)
+        else: 
+            self.D = D
         self.lag = lag
 
     def __getitem__(self, index):
@@ -41,7 +45,7 @@ class TimeSeriesDataset(Dataset):
             }
 
     def __len__(self): 
-        return self.X.shape[-1]-self.lag - 1
+        return self.X.shape[-1]-self.lag
 
 def load_skt(args): 
     """
@@ -65,7 +69,8 @@ def load_skt(args):
     assert args.tr + args.val < 1, "No remaining portion for the test... please let args.tr + args.val < 1"
 
     # data_path 
-    files = [os.path.join(args.data_path, f) for f in os.listdir(args.data_path)]
+    all_files = [os.path.join(args.data_path, f) for f in os.listdir(args.data_path)]
+    files = list(filter(lambda f: f.endswith('.csv'), all_files))
 
     # (1) load data and generate mask...
     # {1, 0} 1 for missing, 0 for not missing
@@ -98,9 +103,12 @@ def load_skt(args):
     args.num_heteros = num_heteros
     args.num_ts = num_ts 
 
+    print(f'original shape of X       : ({num_heteros}, {num_obs}, {num_ts})')
+    print(f'the shape in the dataset: : ({num_heteros}, {num_ts}, {num_obs})')
+
     # (4) train-validation-test split
     start_idx_val = int(X.shape[1]*args.tr)
-    start_idx_te = int(X.shape[1]*args.val)
+    start_idx_te = start_idx_val + int(X.shape[1]*args.val)
 
 
     X_train, X_valid, X_test\

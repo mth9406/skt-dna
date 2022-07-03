@@ -79,7 +79,9 @@ class HeteroMTGNN(nn.Module):
     k : int
         the number of layers at every GC-Module
     embedding_dim : int
-        the size of embedding dimesion in the graph-learning layer
+        the size of embedding dimesion in the graph-learning layer 
+    top_k : int
+        top_k to select as non-zero in the adjacency matrix      
     alpha : float
         controls saturation rate of tanh: activation function in the graph-learning layer
         default = 3.0
@@ -96,7 +98,7 @@ class HeteroMTGNN(nn.Module):
                 k:int, 
                 embedding_dim: int, 
                 device, 
-                alpha: float = 3.0, **kwargs): 
+                alpha: float = 3.0, top_k: int = 4, **kwargs): 
         super().__init__()
         
         # projection layer
@@ -106,8 +108,8 @@ class HeteroMTGNN(nn.Module):
             setattr(self, f'hetero_block{i}', HeteroBlock(num_heteros, k, **kwargs))
         
         # hetero adjacency matrices
-        self.hetero_idx = torch.LongTensor(list(range(num_heteros))).to(device) # to device...
-        self.gen_adj = [AdjConstructor(num_ts, embedding_dim, alpha) for _ in range(num_heteros)]
+        self.ts_idx = torch.LongTensor(list(range(num_ts))).to(device) # to device...
+        self.gen_adj = [AdjConstructor(num_ts, embedding_dim, alpha, top_k= top_k) for _ in range(num_heteros)]
     
         # output_module
         self.fc_out = nn.Conv2d(num_heteros, num_heteros, (1, time_lags), padding= 0)
@@ -119,6 +121,7 @@ class HeteroMTGNN(nn.Module):
         self.num_blocks = num_blocks
         self.k = k 
         self.embedding_dim = embedding_dim 
+        self.top_k = top_k
         self.device = device 
         self.alpha = alpha 
 
@@ -126,14 +129,15 @@ class HeteroMTGNN(nn.Module):
         """Feed forward of the model 
         Assume, x is a pair of x['input'] and x['mask']
         """
-        x = self.projection(x) # bs, c, n, l 
-        A = torch.stack([gll(self.hetero_idx) for gll in self.gen_adj]).to(self.device)
-        out = x.clone().detach()
+        x_batch = make_input_n_mask_pairs(x)
+        x_batch = self.projection(x_batch) # bs, c, n, l 
+        A = torch.stack([gll(self.ts_idx) for gll in self.gen_adj]).to(self.device) # c, n, n 
+        out = x_batch.clone().detach()
         for i in range(self.num_blocks): 
             tc_out, out = getattr(self, f'hetero_block{i}')(out, A, beta)
-            x += tc_out 
-        x += out # bs, c, n, l 
+            x_batch += tc_out 
+        x_batch += out # bs, c, n, l 
         return {
-            'preds': self.fc_out(x)
+            'preds': self.fc_out(x_batch)
         }
         

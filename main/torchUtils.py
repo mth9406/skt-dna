@@ -1,8 +1,4 @@
 import torch
-import torchbnn as bnn
-import torch.nn as nn
-import torch.nn.functional as F
-
 import numpy as np
 
 import os
@@ -86,7 +82,7 @@ def train(args,
             model.train()
             # feed forward
             with torch.set_grad_enabled(True):
-                out = model(x)
+                out = model(x, args.beta)
                 loss = criterion(out['preds'], x['label'])
                 # if out['regularization_loss'] is not None: 
                 #     loss += args.reg_loss_penalty * out['regularization_loss']
@@ -113,7 +109,7 @@ def train(args,
             model.eval()
             loss = 0
             with torch.no_grad():
-                out = model(x)
+                out = model(x, args.beta)
                 loss = criterion(out['preds'], x['label'])
                 # if out['regularization_loss'] is not None: 
                 #     loss += args.reg_loss_penalty * out['regularization_loss']
@@ -162,7 +158,7 @@ def test_regr(args,
         model.eval()
         loss = 0
         with torch.no_grad():
-            out = model(x)
+            out = model(x, args.beta)
             loss = criterion(out['preds'], x['label'])
             loss_reg = 0. 
             # if out['regularization_loss'] is not None: 
@@ -173,27 +169,31 @@ def test_regr(args,
         te_loss_tot += tot_loss.detach().cpu().numpy()
 
 
-        te_r2 += r2_score(out['preds'].detach().cpu().numpy(), x['label'].detach().cpu().numpy())
-        te_mae += mean_absolute_error(out['preds'].detach().cpu().numpy(), x['label'].detach().cpu().numpy()) 
-        te_mse += mean_squared_error(out['preds'].detach().cpu().numpy(), x['label'].detach().cpu().numpy()) 
+        # te_r2 += r2_score(out['preds'].detach().cpu().numpy(), x['label'].detach().cpu().numpy())
+        te_mae += mean_absolute_error(out['preds'].detach().cpu().numpy().flatten(), x['label'].detach().cpu().numpy().flatten()) 
+        te_mse += mean_squared_error(out['preds'].detach().cpu().numpy().flatten(), x['label'].detach().cpu().numpy().flatten()) 
 
-    te_loss_imp = te_loss_imp/len(test_loader)
+    # te_loss_imp = te_loss_imp/len(test_loader)
     te_loss_preds = te_loss_preds/len(test_loader)
     te_loss_tot = te_loss_tot/len(test_loader)
-    te_r2 = te_r2/len(test_loader)
+    # te_r2 = te_r2/len(test_loader)
     te_mae = te_mae/len(test_loader)
     te_mse = te_mse/len(test_loader)
     print("Test done!")
-    print(f"imputation loss: {te_loss_imp:.2f}")
+    # print(f"imputation loss: {te_loss_imp:.2f}")
     print(f"prediction loss: {te_loss_preds:.2f}")
     print(f"total loss: {te_loss_tot:.2f}")
-    print(f"r2: {te_r2:.2f}")
+    # print(f"r2: {te_r2:.2f}")
     print(f"mae: {te_mae:.2f}")
     print(f"mse: {te_mse:.2f}")
     print()    
 
+    # perf = {
+    #     'r2': te_r2,
+    #     'mae': te_mae,
+    #     'mse': te_mse
+    # }
     perf = {
-        'r2': te_r2,
         'mae': te_mae,
         'mse': te_mse
     }

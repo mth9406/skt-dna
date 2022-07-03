@@ -38,8 +38,8 @@ parser.add_argument('--delta', type= float, default=0., help='significant improv
 parser.add_argument('--print_log_option', type= int, default= 10, help= 'print training loss every print_log_option')
 parser.add_argument('--verbose', action= 'store_true', 
                     help= 'print logs about early-stopping')
-parser.add_argument('--reg_loss_penalty', type= float, default= 1e-2,
-                    help= 'loss-penalty term of regularization if any. (default: 1e-2)')
+# parser.add_argument('--reg_loss_penalty', type= float, default= 1e-2,
+#                     help= 'loss-penalty term of regularization if any. (default: 1e-2)')
 # parser.add_argument('--kl_weight', type= float, default= 0.1, help= 'kl-loss of vibi (default = 0.1)')
 # parser.add_argument('--gradient_max_norm', type= float, default= 5,
 #                     help= 'clips gradient norm of an iterable of parameters by \"gradient_max_norm\"')
@@ -51,10 +51,14 @@ parser.add_argument('--num_blocks', type= int, default= 3,
                     help= 'the number of the HeteroBlocks (default= 3)')
 parser.add_argument('--k', type= int, default= 2,
                 help= 'the number of layers at every GC-Module (default= 2)')
+parser.add_argument('--top_k', type= int, default= 4, 
+                help= 'top_k to select as non-zero in the adjacency matrix    (default= 4)')
 parser.add_argument('--embedding_dim', type= int, default= 128,
                 help= 'the size of embedding dimesion in the graph-learning layer (default= 128)')
 parser.add_argument('--alpha', type= float, default= 3.,
                 help= 'controls saturation rate of tanh: activation function in the graph-learning layer (default= 3.0)')      
+parser.add_argument('--beta', type= float , default= 0.5, 
+                help= 'parameter used in the GraphConvolutionModule, must be in the interval [0,1] (default= 0.5)')
 
 # To test
 parser.add_argument('--test', action='store_true', help='test')
@@ -112,7 +116,8 @@ def main(args):
             k= args.k, 
             embedding_dim= args.embedding_dim,
             device= device,
-            alpha= args.alpha
+            alpha= args.alpha,
+            top_k= args.top_k
         )
     else:
         print("The model is yet to be implemented.")

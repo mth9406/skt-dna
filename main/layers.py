@@ -19,11 +19,11 @@ def make_input_n_mask_pairs(x):
     _________
     pair : torch-Tensor 
         the shape of the tensor 'pair' is b, 2*c, n, l 
-        where: 
-            b= batch size of the x['input']
-            c= # chennels of the x['input']
-            n= # time-series of the x['input']
-            l= # time-stamps of the x['input'] 
+        where:          
+            b= batch size of the x['input']          
+            c= # chennels of the x['input']        
+            n= # time-series of the x['input']        
+            l= # time-stamps of the x['input']                   
     """
     b, c, n, p =  x['input'].shape # batch_size, #channel, #time-series, #time-stamps
     pair = torch.zeros((b,2*c,n,p)).to(x['input'].device)
@@ -36,11 +36,11 @@ class ResidualAdd(nn.Module):
 
     # Arguments
     ___________
-    fn : sub-class of nn.Module
+    fn : sub-class of nn.Module          
     
     # Returns
     _________
-    returns residual connection 
+    returns residual connection           
     """
     def __init__(self, fn):
         super().__init__()
@@ -76,10 +76,10 @@ class DilatedInceptionLayer(nn.Module):
     """
     def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__()
-        self.branch1x1 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,1), padding= (0, 0), groups= in_channels, dilation= 1, **kwargs)
-        self.branch1x3 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 1), groups= in_channels, dilation= 1, **kwargs)
-        self.branch1x5 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 2), groups= in_channels, dilation= 2, **kwargs)
-        self.branch1x7 = nn.Conv1d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 3), groups= in_channels, dilation= 3, **kwargs)
+        self.branch1x1 = nn.Conv2d(in_channels, out_channels, kernel_size= (1,1), padding= (0, 0), groups= in_channels, dilation= 1, **kwargs)
+        self.branch1x3 = nn.Conv2d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 1), groups= in_channels, dilation= 1, **kwargs)
+        self.branch1x5 = nn.Conv2d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 2), groups= in_channels, dilation= 2, **kwargs)
+        self.branch1x7 = nn.Conv2d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 3), groups= in_channels, dilation= 3, **kwargs)
 
         self.in_channels, self.out_channels = in_channels, out_channels
 
@@ -117,14 +117,14 @@ class AdjConstructor(nn.Module):
     n_nodes: the number of nodes (node= cell)
     embedding_dim: dimension of the embedding vector
     """
-    def __init__(self, n_nodes, embedding_dim, alpha= 3.): 
+    def __init__(self, n_nodes, embedding_dim, alpha= 3., top_k= 4): 
         super().__init__()
         self.emb1 = nn.Embedding(n_nodes, embedding_dim=embedding_dim)
         self.emb2 = nn.Embedding(n_nodes, embedding_dim=embedding_dim)
         self.theta1 = nn.Linear(embedding_dim, embedding_dim)
         self.theta2 = nn.Linear(embedding_dim, embedding_dim)
         self.alpha = alpha # controls saturation rate of tanh: activation function.
-
+        self.top_k = top_k
     def forward(self, idx):
         emb1 = self.emb1(idx) 
         emb2 = self.emb2(idx) 
@@ -136,7 +136,7 @@ class AdjConstructor(nn.Module):
         mask = torch.zeros(idx.size(0), idx.size(0)).to(idx.device) 
         mask.fill_(float('0'))
         if self.training:
-            s1, t1 = (adj_mat + torch.rand_like(adj_mat)*0.01).topk(self.k, 1) # values, indices
+            s1, t1 = (adj_mat + torch.rand_like(adj_mat)*0.01).topk(self.top_k, 1) # values, indices
         else: 
             s1, t1 = adj_mat.topk(self.k, 1)
         mask.scatter_(1, t1, s1.fill_(1))
