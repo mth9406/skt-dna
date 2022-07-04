@@ -6,7 +6,7 @@ from torch.nn import functional as F
 
 from utils import *
 
-def make_input_n_mask_pairs(x): 
+def make_input_n_mask_pairs(x, device): 
     """A fucntion to make pairs of input-mask
 
     # Parameters
@@ -26,7 +26,7 @@ def make_input_n_mask_pairs(x):
             l= # time-stamps of the x['input']                   
     """
     b, c, n, p =  x['input'].shape # batch_size, #channel, #time-series, #time-stamps
-    pair = torch.zeros((b,2*c,n,p)).to(x['input'].device)
+    pair = torch.zeros((b,2*c,n,p)).to(device)
     pair[:, ::2, ...] = x['input'] 
     pair[:, 1::2, ...] = x['mask']
     return pair
@@ -85,7 +85,7 @@ class DilatedInceptionLayer(nn.Module):
 
     def forward(self, x): 
         b, c, n, p = x.shape
-        outs = torch.zeros(b, 4*c, n, p)
+        outs = torch.zeros(b, 4*c, n, p).to(x.device)
         for i in range(4): 
             branch = getattr(self, f'branch1x{2*i+1}')
             outs[:, i::4, ...] = branch(x) 
@@ -132,13 +132,13 @@ class AdjConstructor(nn.Module):
         emb1 = torch.tanh(self.alpha * self.theta1(emb1))
         emb2 = torch.tanh(self.alpha * self.theta2(emb2))
 
-        adj_mat = F.relu(torch.tanh(self.alpha*(emb1@emb2.T - emb2@emb1.T))) # adjacency matrix
+        adj_mat = torch.relu(torch.tanh(self.alpha*(emb1@emb2.T - emb2@emb1.T))) # adjacency matrix
         mask = torch.zeros(idx.size(0), idx.size(0)).to(idx.device) 
         mask.fill_(float('0'))
         if self.training:
             s1, t1 = (adj_mat + torch.rand_like(adj_mat)*0.01).topk(self.top_k, 1) # values, indices
         else: 
-            s1, t1 = adj_mat.topk(self.k, 1)
+            s1, t1 = adj_mat.topk(self.top_k, 1)
         mask.scatter_(1, t1, s1.fill_(1))
         adj_mat = adj_mat * mask 
         return adj_mat

@@ -1,7 +1,6 @@
 import torch 
 from torch import nn
 from torch.nn import functional as F
-import torchbnn as bnn
 
 from layers import * 
 
@@ -109,7 +108,7 @@ class HeteroMTGNN(nn.Module):
         
         # hetero adjacency matrices
         self.ts_idx = torch.LongTensor(list(range(num_ts))).to(device) # to device...
-        self.gen_adj = [AdjConstructor(num_ts, embedding_dim, alpha, top_k= top_k) for _ in range(num_heteros)]
+        self.gen_adj = nn.ModuleList([AdjConstructor(num_ts, embedding_dim, alpha, top_k= top_k) for _ in range(num_heteros)])
     
         # output_module
         self.fc_out = nn.Conv2d(num_heteros, num_heteros, (1, time_lags), padding= 0)
@@ -129,7 +128,7 @@ class HeteroMTGNN(nn.Module):
         """Feed forward of the model 
         Assume, x is a pair of x['input'] and x['mask']
         """
-        x_batch = make_input_n_mask_pairs(x)
+        x_batch = make_input_n_mask_pairs(x, self.device)
         x_batch = self.projection(x_batch) # bs, c, n, l 
         A = torch.stack([gll(self.ts_idx) for gll in self.gen_adj]).to(self.device) # c, n, n 
         out = x_batch.clone().detach()

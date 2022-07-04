@@ -118,7 +118,7 @@ def main(args):
             device= device,
             alpha= args.alpha,
             top_k= args.top_k
-        )
+        ).to(device)
     else:
         print("The model is yet to be implemented.")
         sys.exit()
