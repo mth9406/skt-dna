@@ -111,7 +111,8 @@ class HeteroMTGNN(nn.Module):
         self.gen_adj = nn.ModuleList([AdjConstructor(num_ts, embedding_dim, alpha, top_k= top_k) for _ in range(num_heteros)])
     
         # output_module
-        self.fc_out = nn.Conv2d(num_heteros, num_heteros, (1, time_lags), padding= 0)
+        # self.fc_out = nn.Conv2d(num_heteros, num_heteros, (1, time_lags), padding= 0)
+        self.fc_out = nn.Conv2d(num_heteros*(num_blocks+2), num_heteros, (1, time_lags), padding= 0)
         # bs, c, n, l  -> bs, c, n, 1
 
         self.num_heteros = num_heteros
@@ -134,8 +135,10 @@ class HeteroMTGNN(nn.Module):
         out = x_batch.clone().detach()
         for i in range(self.num_blocks): 
             tc_out, out = getattr(self, f'hetero_block{i}')(out, A, beta)
-            x_batch += tc_out 
-        x_batch += out # bs, c, n, l 
+            # x_batch += tc_out 
+            x_batch = torch.cat([x_batch, tc_out], dim= 1)
+        # x_batch += out # bs, c, n, l 
+        x_batch = torch.cat([x_batch, out], dim=1)
         return {
             'preds': self.fc_out(x_batch)
         }
