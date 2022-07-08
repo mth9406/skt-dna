@@ -28,6 +28,7 @@ class HeteroBlock(nn.Module):
         super().__init__() 
         self.tc_module = TemporalConvolutionModule(num_heteros, num_heteros, num_heteros, **kwargs)
         self.gc_module = GraphConvolutionModule(num_heteros, num_heteros, k=k, **kwargs)
+        self.gc_module_t = GraphConvolutionModule(num_heteros, num_heteros, k=k, **kwargs)
 
         self.num_heteros = num_heteros
         self.k = k 
@@ -49,6 +50,7 @@ class HeteroBlock(nn.Module):
         res = x 
         out_tc = self.tc_module(x) 
         x = self.gc_module(out_tc, A, beta= beta)
+        x += self.gc_module_t(out_tc, torch.permute(A, (0, 2, 1)), beta= beta)
         return out_tc, torch.relu(x+res)
 
 class HeteroMTGNN(nn.Module): 

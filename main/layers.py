@@ -159,8 +159,8 @@ class InformationPropagtionLayer(nn.Module):
             yet to be used...
         """
         # obtain normalized adjacency matrices
-        A_i = self.norm_adj(A_inter)
-        h = torch.matmul(A_i, x) # bs, c, n, l
+        # A_i = self.norm_adj(A_inter)
+        h = torch.matmul(A_inter, x) # bs, c, n, l
         # h = self.beta * x + (1-self.beta) * h
         return beta * h_in + (1-beta) * h
         
@@ -188,7 +188,7 @@ class GraphConvolutionModule(nn.Module):
     out_features : int
         dimension of the output tensor 
     k : int
-        the number of layers
+        the number of layers (hops)
     """
     def __init__(self, in_features, out_features, k, **kwargs): 
         super().__init__() 
