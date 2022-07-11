@@ -188,15 +188,15 @@ def test_regr(args,
     print(f"mse: {te_mse:.2f}")
     print()    
 
-    # perf = {
-    #     'r2': te_r2,
-    #     'mae': te_mae,
-    #     'mse': te_mse
-    # }
     perf = {
+        'r2': te_r2,
         'mae': te_mae,
         'mse': te_mse
     }
+    # perf = {
+    #     'mae': te_mae,
+    #     'mse': te_mse
+    # }
 
     return perf 
 

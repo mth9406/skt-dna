@@ -32,8 +32,8 @@ def make_input_n_mask_pairs(x, device):
 class ResidualAdd(nn.Module):
     """Residual connection
 
-    # Arguments
-    ___________
+    # Parameters
+    ____________
     fn : sub-class of nn.Module          
     
     # Returns
@@ -182,7 +182,8 @@ class InformationPropagtionLayer(nn.Module):
 # graph convolution module 
 class GraphConvolutionModule(nn.Module): 
     """Graph convolution module
-    Args:
+    # Parameters
+    ____________
     in_features : int
         dimension of the input tensor
     out_features : int
