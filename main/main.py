@@ -26,6 +26,8 @@ parser.add_argument('--val', type= float, default= 0.2,
                 help= 'the ratio of validation data to the original data')
 parser.add_argument('--standardize', action= 'store_true', 
                 help= 'standardize the inputs if it is true.')
+parser.add_argument('--exclude_TA', action= 'store_true', 
+                help= 'exclude TA column if it is set true.')
 parser.add_argument('--lag', type= int, default= 1, 
                 help= 'time-lag (default: 1)')
 
@@ -89,7 +91,7 @@ def main(args):
     print("Loading data...")
     if args.data_type == 'skt':
         # load gestures-data
-        data = load_skt(args)
+        data = load_skt(args) if not args.exclude_TA else load_skt_without_TA(args)
     else: 
         print("Unkown data type, data type should be \"skt\"")
         sys.exit()
@@ -119,6 +121,7 @@ def main(args):
             alpha= args.alpha,
             top_k= args.top_k
         ).to(device)
+        print('The model is on GPU') if next(model.parameters()).is_cuda else print('The model is on CPU')
     else:
         print("The model is yet to be implemented.")
         sys.exit()
