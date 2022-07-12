@@ -13,3 +13,6 @@ meetings/
 
 #ignore data files
 *.csv
+
+#ignore ipynb files
+*.ipynb
