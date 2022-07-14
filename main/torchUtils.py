@@ -1,9 +1,11 @@
 import torch
 import numpy as np
+import pandas as pd
 
 import os
 import csv
 from tqdm import tqdm 
+import networkx as nx
 
 # from sklearn.metrics import confusion_matrix, accuracy_score, recall_score, precision_score, f1_score
 # from sklearn.metrics import ConfusionMatrixDisplay
@@ -211,8 +213,27 @@ def test_regr(args,
         print(f"{fig_path}")
         os.makedirs(fig_path, exist_ok= True)
     else:
-        print("The path to save figrues already exists, skip making the path...")
+        print("The path to save figures already exists, skip making the path...")
+    
+    # make a path to save a graphs 
+    graph_path = os.path.join(args.model_path, 'test/graphs')
+    if not os.path.exists(graph_path):
+        print("Making a path to save graphs...")
+        print(f"{graph_path}")
+        os.makedirs(graph_path, exist_ok= True)
+    else:
+        print("The path to save graphs already exists, skip making the path...")
 
+    options = {
+        'node_color': 'skyblue',
+        'node_size': 3000,
+        'width': 0.5 ,
+        'arrowstyle': '-|>',
+        'arrowsize': 20,
+        'alpha' : 1,
+        'font_size' : 15
+    }
+    idx = torch.LongTensor(np.arange(len(args.columns))).to(device)
     for i in tqdm(range(num_cells), total= num_cells):
         write_csv(args, 'test/predictions', f'predictions{i}.csv', preds[i, ...], args.columns)
         write_csv(args, 'test/labels', f'labels{i}.csv', labels[i, ...], args.columns) 
@@ -227,9 +248,19 @@ def test_regr(args,
             fig.axes[j].legend()
 
         fig.suptitle(f"Prediction and True label plot of {i}th cell/eNB", fontsize=20, position= (0.5, 1.0+0.05))
-        fig.tight_layout()
+        # fig.tight_layout()
         fig_file = os.path.join(fig_path, f'figure{i}.png')
         fig.savefig(fig_file)
+
+        adj_mat = model.gen_adj[i](idx).data.cpu().numpy() 
+        adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
+        plt.figure(figsize =(15,15))
+        plt.xkcd()
+        G = nx.from_pandas_adjacency(adj_mat)
+        G = nx.DiGraph(G)
+        pos = nx.circular_layout(G)
+        nx.draw_networkx(G, pos=pos, **options)
+        plt.savefig(os.path.join(graph_path, f"graph{i}.png"), format="PNG")
 
     perf = {
         'r2': te_r2,
