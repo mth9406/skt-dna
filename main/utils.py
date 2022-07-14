@@ -1,4 +1,6 @@
 import numpy as np
+import os
+import csv
 
 def standardize(X_train):
     cache = {'mean':0, 'std':0}
@@ -60,3 +62,14 @@ def fourier_imputation(f, mask, window= 100, thr= None):
         else: 
             i += 1
     return f_ret
+
+def write_csv(args, path_name, file_name, data): 
+    log_path= os.path.join(args.model_path, path_name)
+    os.makedirs(log_path, exist_ok= True)
+    log_file= os.path.join(log_path, file_name)
+    with open(log_file, 'w', newline= '') as f:
+        wr = csv.writer(f)
+        n = len(data) # f: n x p numpy data
+        # wr.writerow(list(logs.keys()))
+        for i in range(n):
+            wr.writerow(data[i, :])    

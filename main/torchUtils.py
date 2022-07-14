@@ -3,13 +3,14 @@ import numpy as np
 
 import os
 import csv
+from tqdm import tqdm 
 
 # from sklearn.metrics import confusion_matrix, accuracy_score, recall_score, precision_score, f1_score
 # from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
-# from matplotlib import pyplot as plt
+from matplotlib import pyplot as plt
 
 from utils import *
 
@@ -151,6 +152,9 @@ def test_regr(args,
     te_mae = 0
     te_mse = 0
     
+    preds = [] # to store predictions
+    labels = []
+
     for batch_idx, x in enumerate(test_loader):
         x['input'], x['mask'], x['label'] \
             = x['input'].to(device), x['mask'].to(device), x['label'].to(device)
@@ -161,13 +165,13 @@ def test_regr(args,
             out = model(x, args.beta)
             loss = criterion(out['preds'], x['label'])
             loss_reg = 0. 
-            # if out['regularization_loss'] is not None: 
-            #     loss_reg += args.reg_loss_penalty * out['regularization_loss']
             tot_loss = loss + loss_reg
-      
+            # store predictions
+            preds.append(out['preds'].detach().cpu())
+            labels.append(x['label'].detach().cpu())
+
         te_loss_preds += loss.detach().cpu().numpy()
         te_loss_tot += tot_loss.detach().cpu().numpy()
-
 
         te_r2 += r2_score(out['preds'].detach().cpu().numpy().flatten(), x['label'].detach().cpu().numpy().flatten())
         te_mae += mean_absolute_error(out['preds'].detach().cpu().numpy().flatten(), x['label'].detach().cpu().numpy().flatten()) 
@@ -187,6 +191,22 @@ def test_regr(args,
     print(f"mae: {te_mae:.2f}")
     print(f"mse: {te_mse:.2f}")
     print()    
+
+    # concatenate predictions
+    print('saving the predictions...')
+    preds = torch.concat(preds, dim=0) # num_obs, num_cells, num_time_series, 1 
+    preds = torch.permute(torch.squeeze(preds), (1, 0, 2)) # num_cells, num_obs, num_time_series 
+    preds = preds.numpy()
+
+    labels = torch.concat(labels, dim=0) # num_obs, num_cells, num_time_series, 1
+    labels = torch.permute(torch.squeeze(labels), (1, 0, 2)) # num_cells, num_obs, num_time_series
+    labels = labels.numpy()
+    
+    num_cells = labels.shape[0]
+
+    for i in tqdm(range(num_cells), total= num_cells):
+        write_csv(args, 'test/predictions', f'predictions{i}.csv', preds[i, ...])
+        write_csv(args, 'test/labels', f'labels{i}.csv', labels[i, ...]) 
 
     perf = {
         'r2': te_r2,
