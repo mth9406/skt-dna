@@ -221,10 +221,10 @@ def test_regr(args,
 
         for j in range(len(args.columns)):
             col_name = args.columns[i]
-            fig.axes[i].set_title(f'time-sereis plot: {col_name}')
-            fig.axes[i].plot(preds[i,:,j], label= 'prediction')
-            fig.axes[i].plot(labels[i,:,j], label= 'label')
-            fig.axes[i].legend()
+            fig.axes[j].set_title(f'time-sereis plot: {col_name}')
+            fig.axes[j].plot(preds[i,:,j], label= 'prediction')
+            fig.axes[j].plot(labels[i,:,j], label= 'label')
+            fig.axes[j].legend()
 
         fig.suptitle(f"Prediction and True label plot of {i}th cell/eNB", fontsize=20, position= (0.5, 1.0+0.05))
         fig.tight_layout()
