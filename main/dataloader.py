@@ -80,13 +80,19 @@ def load_skt(args):
     for f in tqdm(files, total= len(files)): 
         x = pd.read_csv(f)
         x = x.iloc[:, 1:-1] 
-        # RRC_CNT	RRC_FAIL_RATE	
-        # CALL_RELEASE_CNT	CALL_RELEASE_ANOMALY_CNT	
-        # DL_PRB	CQI	RSRP	RSRQ	
-        # UPLINK_SINR	UE_TX_POWER	TA
+        # Time_Stamp,
+        # RRC_CNT, RRC_FAIL_RATE, CALL_RELEASE_ANOMALY_CNT,
+        # DL_PRB, CQI, RSRP, RSRQ, U
+        # PLINK_SINR, UE_TX_POWER, TA
         m = ~x.isna() * 1.
         X.append(x.values) 
         M.append(m.values)
+
+    # columns
+    args.columns =[
+        'RRC_CNT','RRC_FAIL_RATE','CALL_RELEASE_ANOMALY_CNT',
+        'DL_PRB', 'CQI','RSRP','RSRQ','UPLINK_SINR','UE_TX_POWER','TA' 
+    ] 
 
     X = np.stack(X)
     M = np.stack(M)
@@ -163,6 +169,12 @@ def load_skt_without_TA(args):
         m = ~x.isna() * 1.
         X.append(x.values) 
         M.append(m.values)
+
+    # columns
+    args.columns =[
+        'RRC_CNT','RRC_FAIL_RATE','CALL_RELEASE_ANOMALY_CNT',
+        'DL_PRB', 'CQI','RSRP','RSRQ','UPLINK_SINR','UE_TX_POWER'
+    ] 
 
     X = np.stack(X)
     M = np.stack(M)

@@ -63,7 +63,7 @@ def fourier_imputation(f, mask, window= 100, thr= None):
             i += 1
     return f_ret
 
-def write_csv(args, path_name, file_name, data): 
+def write_csv(args, path_name, file_name, data, columns= None): 
     log_path= os.path.join(args.model_path, path_name)
     os.makedirs(log_path, exist_ok= True)
     log_file= os.path.join(log_path, file_name)
@@ -71,5 +71,7 @@ def write_csv(args, path_name, file_name, data):
         wr = csv.writer(f)
         n = len(data) # f: n x p numpy data
         # wr.writerow(list(logs.keys()))
+        if columns is not None: 
+            wr.writerow(columns)
         for i in range(n):
             wr.writerow(data[i, :])    

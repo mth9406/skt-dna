@@ -204,9 +204,32 @@ def test_regr(args,
     
     num_cells = labels.shape[0]
 
+    # make a path to save a figures 
+    fig_path = os.path.join(args.model_path, 'test/figures')
+    if not os.path.exists(fig_path):
+        print("Making a path to save figures...")
+        print(f"{fig_path}")
+        os.makedirs(fig_path, exist_ok= True)
+    else:
+        print("The path to save figrues already exists, skip making the path...")
+
     for i in tqdm(range(num_cells), total= num_cells):
-        write_csv(args, 'test/predictions', f'predictions{i}.csv', preds[i, ...])
-        write_csv(args, 'test/labels', f'labels{i}.csv', labels[i, ...]) 
+        write_csv(args, 'test/predictions', f'predictions{i}.csv', preds[i, ...], args.columns)
+        write_csv(args, 'test/labels', f'labels{i}.csv', labels[i, ...], args.columns) 
+        
+        fig, axes = plt.subplots(len(args.columns), 1, figsize= (10,20))
+
+        for j in range(len(args.columns)):
+            col_name = args.columns[i]
+            fig.axes[i].set_title(f'time-sereis plot: {col_name}')
+            fig.axes[i].plot(preds[i,:,j], label= 'prediction')
+            fig.axes[i].plot(labels[i,:,j], label= 'label')
+            fig.axes[i].legend()
+
+        fig.suptitle(f"Prediction and True label plot of {i}th cell/eNB", fontsize=20, position= (0.5, 1.0+0.05))
+        fig.tight_layout()
+        fig_file = os.path.join(fig_path, f'figure{i}.png')
+        fig.savefig(fig_file)
 
     perf = {
         'r2': te_r2,
