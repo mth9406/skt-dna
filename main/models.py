@@ -4,55 +4,6 @@ from torch.nn import functional as F
 
 from layers import * 
 
-class HeteroBlock(nn.Module):
-    """Hetero block 
-    This block contains TC-Module + GC-Module and its residual connection.
-
-    # Arguments
-    ___________
-    num_heteros : int
-        the number of heterogeneous groups
-    k : int 
-        the number of layers at every GC-Module
-    It takes the followings in the feed-forward procedures.
-    * Adjacency matrix from the 'Graph-Learning-Layer' 
-    * Another input from the previous 'HeteroBlock' module
-    
-    # Returns
-    _________
-    It returns two outputs 
-    * output from TC-Module
-    * output from GC-Module which takes an output of TC-Module as an input.
-    """
-    def __init__(self, num_heteros:int, k:int, **kwargs): 
-        super().__init__() 
-        self.tc_module = TemporalConvolutionModule(num_heteros, num_heteros, num_heteros, **kwargs)
-        self.gc_module = GraphConvolutionModule(num_heteros, num_heteros, k=k, **kwargs)
-        self.gc_module_t = GraphConvolutionModule(num_heteros, num_heteros, k=k, **kwargs)
-
-        self.num_heteros = num_heteros
-        self.k = k 
-        # input shape: b, c, n, l 
-
-    def forward(self, x, A, beta= 0.5): 
-        """Feed forward        
-        returns two outputs
-        * output from TC-Module
-        * output from GC-Module which takes an output of TC-Module as an input.     
-
-        # Arguments
-        ___________
-        x : torch-tensor 
-            Input tensor
-        A : torch-tensor
-            Adjacency matrix    
-        """
-        res = x 
-        out_tc = self.tc_module(x) 
-        x = self.gc_module(out_tc, A, beta= beta)
-        x += self.gc_module_t(out_tc, torch.permute(A, (0, 2, 1)), beta= beta)
-        return out_tc, torch.relu(x+res)
-
 class HeteroMTGNN(nn.Module): 
     """Heterogeneous Multivariate Time Series Forecasting with Graph Neural Networks 
     
