@@ -1,8 +1,8 @@
-torch @ https://download.pytorch.org/whl/cu113/torch-1.11.0%2Bcu113-cp37-cp37m-linux_x86_64.whl
-torchaudio @ https://download.pytorch.org/whl/cu113/torchaudio-0.11.0%2Bcu113-cp37-cp37m-linux_x86_64.whl
+torch 
+torchaudio 
 torchsummary==1.5.1
 torchtext==0.12.0
-torchvision @ https://download.pytorch.org/whl/cu113/torchvision-0.12.0%2Bcu113-cp37-cp37m-linux_x86_64.whl
+torchvision 
 tqdm==4.64.0
 
 sklearn==0.0
