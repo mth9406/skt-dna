@@ -20,32 +20,29 @@ class TimeSeriesDataset(Dataset):
     """
     def __init__(self, X, M, D= None, lag= 1):
         super().__init__()
-        # X: (5363, 2293, 10) -> (5363, 10, 2293)
-        # M: (5363, 2293, 10) -> (5363, 10, 2293)
-        self.X, self.M = X.permute(0, 2, 1), M.permute(0, 2, 1)
-        if D is not None: 
-            self.D = D.permute(0, 2, 1)
-        else: 
-            self.D = D
+        # X: (5363, 2293, 10)
+        # M: (5363, 2293, 10)
+        self.X, self.M = X, M
+        self.D = D
         self.lag = lag
 
     def __getitem__(self, index):
         if self.D is None: 
             return {
-                "input": self.X[:, :, index:index+self.lag],
-                "mask": self.M[:, :, index:index+self.lag],
-                "label": self.X[:, :, index+self.lag:index+self.lag+1]
+                "input": self.X[:, index:index+self.lag, :],
+                "mask": self.M[:, index:index+self.lag, :],
+                "label": self.X[:, index+self.lag:index+self.lag+1, :]
             }
         else: 
             return {
-                "input": self.X[:, :, index:index+self.lag],
-                "mask": self.M[:, :, index:index+self.lag],
-                "label": self.X[:, :, index+self.lag:index+self.lag+1],
+                "input": self.X[:, index:index+self.lag, :],
+                "mask": self.M[:, index:index+self.lag, :],
+                "label": self.X[:, index+self.lag:index+self.lag+1, :],
                 "time_interval":self.D[index]               
             }
 
     def __len__(self): 
-        return self.X.shape[-1]-self.lag
+        return self.X.shape[1]-self.lag
 
 def load_skt(args): 
     """
@@ -109,8 +106,8 @@ def load_skt(args):
     args.num_heteros = num_heteros
     args.num_ts = num_ts 
 
-    print(f'original shape of X       : ({num_heteros}, {num_obs}, {num_ts})')
-    print(f'the shape in the dataset: : ({num_heteros}, {num_ts}, {num_obs})')
+    print(f'the shape of X       : ({num_heteros}, {num_obs}, {num_ts})')
+    # print(f'the shape in the dataset: : ({num_heteros}, {num_ts}, {num_obs})')
 
     # (4) train-validation-test split
     start_idx_val = int(X.shape[1]*args.tr)
@@ -191,8 +188,8 @@ def load_skt_without_TA(args):
     args.num_heteros = num_heteros
     args.num_ts = num_ts 
 
-    print(f'original shape of X       : ({num_heteros}, {num_obs}, {num_ts})')
-    print(f'the shape in the dataset: : ({num_heteros}, {num_ts}, {num_obs})')
+    print(f'the shape of X       : ({num_heteros}, {num_obs}, {num_ts})')
+    # print(f'the shape in the dataset: : ({num_heteros}, {num_ts}, {num_obs})')
 
     # (4) train-validation-test split
     start_idx_val = int(X.shape[1]*args.tr)

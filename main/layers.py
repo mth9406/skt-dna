@@ -74,10 +74,10 @@ class DilatedInceptionLayer(nn.Module):
     """
     def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__()
-        self.branch1x1 = nn.Conv2d(in_channels, out_channels, kernel_size= (1,1), padding= (0, 0), groups= in_channels, dilation= 1, **kwargs)
-        self.branch1x3 = nn.Conv2d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 1), groups= in_channels, dilation= 1, **kwargs)
-        self.branch1x5 = nn.Conv2d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 2), groups= in_channels, dilation= 2, **kwargs)
-        self.branch1x7 = nn.Conv2d(in_channels, out_channels, kernel_size= (1,3), padding= (0, 3), groups= in_channels, dilation= 3, **kwargs)
+        self.branch1x1 = nn.Conv2d(in_channels, out_channels, kernel_size= (1,1), padding= (0,0), groups= in_channels, dilation= 1, **kwargs)
+        self.branch1x3 = nn.Conv2d(in_channels, out_channels, kernel_size= (3,1), padding= (1,0), groups= in_channels, dilation= 1, **kwargs)
+        self.branch1x5 = nn.Conv2d(in_channels, out_channels, kernel_size= (3,1), padding= (2,0), groups= in_channels, dilation= 2, **kwargs)
+        self.branch1x7 = nn.Conv2d(in_channels, out_channels, kernel_size= (3,1), padding= (3,0), groups= in_channels, dilation= 3, **kwargs)
 
         self.in_channels, self.out_channels = in_channels, out_channels
 
@@ -160,25 +160,10 @@ class InformationPropagtionLayer(nn.Module):
         """
         # obtain normalized adjacency matrices
         # A_i = self.norm_adj(A_inter)
-        h = torch.matmul(A_inter, x) # bs, c, n, l
+        h = torch.matmul(x, A_inter) # bs, c, t, n 
         # h = self.beta * x + (1-self.beta) * h
         return beta * h_in + (1-beta) * h
         
-    def norm_adj(self, A): 
-        """Obtains normalized version of an adjacency matrix
-        """
-        assert len(A.shape) == 3 or len(A.shape) == 2, "Improper shape of an adjacency matrix, must be either C x C or C x N x N"
-        with torch.no_grad():
-            if len(A.shape) == 3: 
-                eyes = torch.stack([torch.eye(A.shape[1]) for _ in range(A.shape[0])]).to(device= A.device)
-                D_tilde_inv = torch.diag_embed(1/(1. + torch.sum(A, dim=2))) # C x N x N 
-                A_tilde = D_tilde_inv @ (A + eyes)
-            else: 
-                eye = torch.eye(A.shape[1]).to(A.device)
-                D_tilde_inv = torch.diag(1/(1.+torch.sum(A, dim=1)))
-                A_tilde = D_tilde_inv @ (A + eye)
-        return A_tilde 
-
 # graph convolution module 
 class GraphConvolutionModule(nn.Module): 
     """Graph convolution module
@@ -227,7 +212,7 @@ class GraphConvolutionModule(nn.Module):
         with torch.no_grad():
             if len(A.shape) == 3: 
                 eyes = torch.stack([torch.eye(A.shape[1]) for _ in range(A.shape[0])]).to(device= A.device)
-                D_tilde_inv = torch.diag_embed(1/(1. + torch.sum(A, dim=2))) # C x N x N 
+                D_tilde_inv = torch.diag_embed(1/(1. + torch.sum(A, dim=1))) # C x N x N 
                 A_tilde = D_tilde_inv @ (A + eyes)
             else: 
                 eye = torch.eye(A.shape[1]).to(A.device)

@@ -65,7 +65,7 @@ class HeteroMTGNN(nn.Module):
     
         # output_module
         # self.fc_out = nn.Conv2d(num_heteros, num_heteros, (1, time_lags), padding= 0)
-        self.fc_out = nn.Conv2d(num_heteros*(num_blocks+2), num_heteros, (1, time_lags), padding= 0)
+        self.fc_out = nn.Conv2d(num_heteros*(num_blocks+2), num_heteros, (time_lags,1), padding= 0)
         # bs, c, n, l  -> bs, c, n, 1
 
         self.num_heteros = num_heteros

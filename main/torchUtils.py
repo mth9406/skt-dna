@@ -238,24 +238,24 @@ def test_regr(args,
         write_csv(args, 'test/predictions', f'predictions{i}.csv', preds[i, ...], args.columns)
         write_csv(args, 'test/labels', f'labels{i}.csv', labels[i, ...], args.columns) 
         
-        fig, axes = plt.subplots(len(args.columns), 1, figsize= (10,20))
+        fig, axes = plt.subplots(len(args.columns), 1, figsize= (10,3*len(args.columns)))
 
         for j in range(len(args.columns)):
-            col_name = args.columns[i]
+            col_name = args.columns[j]
             fig.axes[j].set_title(f'time-sereis plot: {col_name}')
             fig.axes[j].plot(preds[i,:,j], label= 'prediction')
             fig.axes[j].plot(labels[i,:,j], label= 'label')
             fig.axes[j].legend()
 
         fig.suptitle(f"Prediction and True label plot of {i}th cell/eNB", fontsize=20, position= (0.5, 1.0+0.05))
-        # fig.tight_layout()
+        fig.tight_layout()
         fig_file = os.path.join(fig_path, f'figure{i}.png')
         fig.savefig(fig_file)
 
         adj_mat = model.gen_adj[i](idx).data.cpu().numpy() 
         adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
         plt.figure(figsize =(15,15))
-        plt.xkcd()
+        # plt.xkcd()
         G = nx.from_pandas_adjacency(adj_mat)
         G = nx.DiGraph(G)
         pos = nx.circular_layout(G)
