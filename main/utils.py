@@ -10,6 +10,14 @@ def standardize(X_train):
 def standardize_test(X_test, cache):
     return (X_test-cache['mean'])/cache['std']
 
+def min_max_scaler(X, cache, columns): 
+    return (X-cache['min'][columns])/(cache['max'][columns]-cache['min'][columns])
+
+def inv_min_max_scaler(X, cache, columns): 
+    min = cache['min'][columns].values[np.newaxis, :]
+    max = cache['max'][columns].values[np.newaxis, :]
+    return (max-min)*X + min
+
 def fft_ifft(f, pad_num, thr= None):
     t = np.arange(0, len(f))
     n = len(f) 

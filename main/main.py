@@ -30,6 +30,8 @@ parser.add_argument('--exclude_TA', action= 'store_true',
                 help= 'exclude TA column if it is set true.')
 parser.add_argument('--lag', type= int, default= 1, 
                 help= 'time-lag (default: 1)')
+parser.add_argument('--cache_file', type= str, default= './data/cache.pickle', 
+                help= 'a cache file to min-max scale the data')
 
 # Training options
 parser.add_argument('--batch_size', type=int, default=32, help='input batch size')

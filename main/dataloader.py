@@ -4,6 +4,7 @@ from utils import *
 import numpy as np
 import pandas as pd 
 from tqdm import tqdm
+import pickle
 
 import os
 
@@ -75,11 +76,24 @@ def load_skt(args):
     X = []
     M = []
 
+    # columns
+    args.columns =[
+        'RRC_CNT','RRC_FAIL_RATE','CALL_RELEASE_ANOMALY_CNT',
+        'DL_PRB', 'CQI','RSRP','RSRQ','UPLINK_SINR','UE_TX_POWER','TA' 
+    ] 
+    # load
+    try:            
+        with open(args.cache_file, 'rb') as f:
+            cache = pickle.load(f)
+    except: 
+        cache = None
+    args.cache= cache
+
     for f in tqdm(files, total= len(files)): 
         x = pd.read_csv(f)
-        x = x.iloc[:, 1:] 
-        x['RSRP'] = -x['RSRP']
-        x['RSRQ'] = -x['RSRQ']
+        x = x.iloc[:, 1:]
+        x = min_max_scaler(x, cache, columns= args.columns) if cache is not None else x 
+        print(x.shape)
         # Time_Stamp,
         # RRC_CNT, RRC_FAIL_RATE, CALL_RELEASE_ANOMALY_CNT,
         # DL_PRB, CQI, RSRP, RSRQ, 
@@ -87,12 +101,6 @@ def load_skt(args):
         m = ~x.isna() * 1.
         X.append(x.values) 
         M.append(m.values)
-
-    # columns
-    args.columns =[
-        'RRC_CNT','RRC_FAIL_RATE','CALL_RELEASE_ANOMALY_CNT',
-        'DL_PRB', 'CQI','NEG_RSRP','NEG_RSRQ','UPLINK_SINR','UE_TX_POWER','TA' 
-    ] 
 
     X = np.stack(X)
     M = np.stack(M)
@@ -159,24 +167,30 @@ def load_skt_without_TA(args):
     X = []
     M = []
 
-    for f in tqdm(files, total= len(files)): 
-        x = pd.read_csv(f)
-        x = x.iloc[:, 1:-1] 
-        x['RSRP'] = -x['RSRP']
-        x['RSRQ'] = -x['RSRQ']
-        # RRC_CNT	RRC_FAIL_RATE	
-        # CALL_RELEASE_CNT	CALL_RELEASE_ANOMALY_CNT	
-        # DL_PRB	CQI	RSRP	RSRQ	
-        # UPLINK_SINR	UE_TX_POWER	(TA-excluded)
-        m = ~x.isna() * 1.
-        X.append(x.values) 
-        M.append(m.values)
-
     # columns
     args.columns =[
         'RRC_CNT','RRC_FAIL_RATE','CALL_RELEASE_ANOMALY_CNT',
-        'DL_PRB', 'CQI','NEG_RSRP','NEG_RSRQ','UPLINK_SINR','UE_TX_POWER'
+        'DL_PRB', 'CQI','RSRP','RSRQ','UPLINK_SINR','UE_TX_POWER'
     ] 
+    # load
+    try:            
+        with open(args.cache_file, 'rb') as f:
+            cache = pickle.load(f)
+    except: 
+        cache = None
+    args.cache= cache
+
+    for f in tqdm(files, total= len(files)): 
+        x = pd.read_csv(f)
+        x = x.iloc[:, 1:-1]
+        x = min_max_scaler(x, cache, columns= args.columns) if cache is not None else x 
+        # Time_Stamp,
+        # RRC_CNT, RRC_FAIL_RATE, CALL_RELEASE_ANOMALY_CNT,
+        # DL_PRB, CQI, RSRP, RSRQ, 
+        # UPLINK_SINR, UE_TX_POWER, TA
+        m = ~x.isna() * 1.
+        X.append(x.values) 
+        M.append(m.values)
 
     X = np.stack(X)
     M = np.stack(M)
