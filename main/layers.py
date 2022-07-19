@@ -256,12 +256,12 @@ class HeteroBlock(nn.Module):
         * output from TC-Module
         * output from GC-Module which takes an output of TC-Module as an input.     
 
-        # Arguments
-        ___________
-        x : torch-tensor 
-            Input tensor
-        A : torch-tensor
-            Adjacency matrix    
+        # Arguments       
+        ___________        
+        x : torch-tensor        
+            Input tensor             
+        A : torch-tensor           
+            Adjacency matrix        
         """
         res = x 
         out_tc = self.tc_module(x) 
