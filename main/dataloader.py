@@ -31,7 +31,8 @@ class TimeSeriesDataset(Dataset):
             return {
                 "input": self.X[:, index:index+self.lag, :],
                 "mask": self.M[:, index:index+self.lag, :],
-                "label": self.X[:, index+self.lag:index+self.lag+1, :]
+                "label": self.X[:, index+self.lag:index+self.lag+1, :], 
+                "label_mask": self.M[:, index+self.lag:index+self.lag+1, :]
             }
         else: 
             return {
@@ -77,10 +78,12 @@ def load_skt(args):
     for f in tqdm(files, total= len(files)): 
         x = pd.read_csv(f)
         x = x.iloc[:, 1:-1] 
+        x['RSRP'] = -x['RSRP']
+        x['RSRQ'] = -x['RSRQ']
         # Time_Stamp,
         # RRC_CNT, RRC_FAIL_RATE, CALL_RELEASE_ANOMALY_CNT,
-        # DL_PRB, CQI, RSRP, RSRQ, U
-        # PLINK_SINR, UE_TX_POWER, TA
+        # DL_PRB, CQI, RSRP, RSRQ, 
+        # UPLINK_SINR, UE_TX_POWER, TA
         m = ~x.isna() * 1.
         X.append(x.values) 
         M.append(m.values)
@@ -88,7 +91,7 @@ def load_skt(args):
     # columns
     args.columns =[
         'RRC_CNT','RRC_FAIL_RATE','CALL_RELEASE_ANOMALY_CNT',
-        'DL_PRB', 'CQI','RSRP','RSRQ','UPLINK_SINR','UE_TX_POWER','TA' 
+        'DL_PRB', 'CQI','NEG_RSRP','NEG_RSRQ','UPLINK_SINR','UE_TX_POWER','TA' 
     ] 
 
     X = np.stack(X)
@@ -159,6 +162,8 @@ def load_skt_without_TA(args):
     for f in tqdm(files, total= len(files)): 
         x = pd.read_csv(f)
         x = x.iloc[:, 1:-2] 
+        x['RSRP'] = -x['RSRP']
+        x['RSRQ'] = -x['RSRQ']
         # RRC_CNT	RRC_FAIL_RATE	
         # CALL_RELEASE_CNT	CALL_RELEASE_ANOMALY_CNT	
         # DL_PRB	CQI	RSRP	RSRQ	
@@ -170,7 +175,7 @@ def load_skt_without_TA(args):
     # columns
     args.columns =[
         'RRC_CNT','RRC_FAIL_RATE','CALL_RELEASE_ANOMALY_CNT',
-        'DL_PRB', 'CQI','RSRP','RSRQ','UPLINK_SINR','UE_TX_POWER'
+        'DL_PRB', 'CQI','NEG_RSRP','NEG_RSRQ','UPLINK_SINR','UE_TX_POWER'
     ] 
 
     X = np.stack(X)
