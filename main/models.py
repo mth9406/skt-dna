@@ -1,6 +1,5 @@
 import torch 
 from torch import nn
-from torch.nn import functional as F
 
 from layers import * 
 from graphLearningLayers import * 
@@ -55,7 +54,7 @@ class HeteroMTGNN(nn.Module):
         super().__init__()
         
         # projection layer
-        self.projection = ProjectionConv1x1Layer(2*num_heteros, num_heteros, groups= num_heteros, **kwargs)
+        self.projection = ProjectionConv1x1Layer(num_heteros, num_heteros, groups= num_heteros, **kwargs)
         # hetero blocks
         for i in range(num_blocks): 
             setattr(self, f'hetero_block{i}', HeteroBlock(num_heteros, k, **kwargs))
@@ -66,8 +65,27 @@ class HeteroMTGNN(nn.Module):
     
         # output_module
         # self.fc_out = nn.Conv2d(num_heteros, num_heteros, (1, time_lags), padding= 0)
-        self.fc_out = nn.Conv2d(num_heteros*(num_blocks+2), num_heteros, (time_lags,1), padding= 0)
-        # bs, c, n, l  -> bs, c, n, 1
+        self.fc_decode = nn.Sequential(
+            nn.Conv2d(num_heteros*(num_blocks+2), num_heteros, kernel_size=1,  groups= num_heteros, padding= 0), 
+            nn.BatchNorm2d(num_heteros),
+            nn.GELU(), 
+            ResidualAdd(nn.Sequential(
+            nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, groups= num_heteros, padding= 0), 
+            nn.BatchNorm2d(num_heteros), 
+            nn.GELU(),
+            nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, padding= 0)
+            )), 
+            nn.GELU()
+        )
+        self.fc_out = nn.Sequential(
+            nn.Conv2d(num_heteros, num_heteros, kernel_size= (time_lags,1), padding= 0), 
+            nn.GELU()
+        )
+            
+        self.mask_block = nn.Sequential(
+            ResidualAdd(TemporalConvolutionModule(num_heteros, num_heteros, num_heteros)),
+            nn.Conv2d(num_heteros, num_heteros, kernel_size=(time_lags,1), groups= num_heteros)
+        )
 
         self.num_heteros = num_heteros
         self.num_ts = num_ts 
@@ -83,17 +101,32 @@ class HeteroMTGNN(nn.Module):
         """Feed forward of the model 
         Assume, x is a pair of x['input'] and x['mask']
         """
-        x_batch = make_input_n_mask_pairs(x, self.device)
-        x_batch = self.projection(x_batch) # bs, c, n, l 
+        # x_batch = make_input_n_mask_pairs(x, self.device)
+        x_batch, mask_batch = x['input'], x['mask']
+        x_batch = self.projection(x_batch) # bs, c (=num_heteros), t, n 
+        bs, c, t, n = x_batch.shape
         A = torch.stack([gll(self.ts_idx) for gll in self.gen_adj]).to(self.device) # c, n, n 
+        outs_label = torch.zeros((bs, c * (self.num_blocks+2), t, n)).to(self.device) # to collect outputs from modules
         out = x_batch.clone().detach()
+        outs_label[:, ::(self.num_blocks+2), ...] = out
         for i in range(self.num_blocks): 
             tc_out, out = getattr(self, f'hetero_block{i}')(out, A, beta)
             # x_batch += tc_out 
-            x_batch = torch.cat([x_batch, tc_out], dim= 1)
+            outs_label[:, (i+1)::(self.num_blocks+2), ...] = tc_out
+            # x_batch = torch.cat([x_batch, tc_out], dim= 1)
         # x_batch += out # bs, c, n, l 
-        x_batch = torch.cat([x_batch, out], dim=1)
+        outs_label[:, (self.num_blocks+1)::(self.num_blocks+2), ...] = out
+        # x_batch = torch.cat([x_batch, out], dim=1)
+        
+        # fc_out 
+        outs_label = self.fc_decode(outs_label)
+        outs_label = self.fc_out(outs_label)
+        
+        outs_mask = torch.sigmoid(self.mask_block(mask_batch)) # masks
+
         return {
-            'preds': self.fc_out(x_batch)
+            'preds': outs_label * outs_mask, 
+            'outs_label': outs_label, 
+            'outs_mask': outs_mask
         }
         

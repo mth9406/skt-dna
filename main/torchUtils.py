@@ -1,4 +1,5 @@
 import torch
+from torch import nn 
 import numpy as np
 import pandas as pd
 
@@ -69,24 +70,34 @@ def train(args,
           device):
     logs = {
         'tr_loss':[],
-        'valid_loss':[]
+        'tr_mse_loss':[],
+        'tr_bce_loss':[],
+        'valid_loss':[],
+        'valid_mse_loss':[],
+        'valid_bce_loss':[]
     }
 
     num_batches = len(train_loader)
     print('Start training...')
+    criterion_mask = nn.BCELoss()
     for epoch in range(args.epoch):
         # to store losses per epoch
         tr_loss, valid_loss = 0, 0
+        tr_mse_loss, tr_bce_loss = 0, 0 
+        valid_mse_loss, valid_bce_loss = 0, 0
+
         # a training loop
         for batch_idx, x in enumerate(train_loader):
-            x['input'], x['mask'], x['label'] \
-                = x['input'].to(device), x['mask'].to(device), x['label'].to(device)
+            x['input'], x['mask'], x['label'], x['label_mask'] \
+                = x['input'].to(device), x['mask'].to(device), x['label'].to(device), x['label_mask'].to(device)
 
             model.train()
             # feed forward
             with torch.set_grad_enabled(True):
                 out = model(x, args.beta)
-                loss = criterion(out['preds'], x['label'])
+                mse_loss = criterion(out['outs_label'], x['label'])
+                bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
+                loss = mse_loss + bce_loss
                 # if out['regularization_loss'] is not None: 
                 #     loss += args.reg_loss_penalty * out['regularization_loss']
             
@@ -99,6 +110,8 @@ def train(args,
 
             # store the d_tr_loss
             tr_loss += loss.detach().cpu().item()
+            tr_mse_loss += mse_loss.detach().cpu().item() 
+            tr_bce_loss += bce_loss.detach().cpu().item() 
 
             if (batch_idx+1) % args.print_log_option == 0:
                 print(f'Epoch [{epoch+1}/{args.epoch}] Batch [{batch_idx+1}/{num_batches}]: \
@@ -106,24 +119,36 @@ def train(args,
 
         # a validation loop 
         for batch_idx, x in enumerate(valid_loader):
-            x['input'], x['mask'], x['label'] \
-                = x['input'].to(device), x['mask'].to(device), x['label'].to(device)
+            x['input'], x['mask'], x['label'], x['label_mask'] \
+                = x['input'].to(device), x['mask'].to(device), x['label'].to(device), x['label_mask'].to(device)
             
             model.eval()
             loss = 0
             with torch.no_grad():
                 out = model(x, args.beta)
-                loss = criterion(out['preds'], x['label'])
+                mse_loss = criterion(out['outs_label'], x['label'])
+                bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
+                loss = mse_loss + bce_loss
+                # loss = criterion(out['preds'], x['label'])
                 # if out['regularization_loss'] is not None: 
                 #     loss += args.reg_loss_penalty * out['regularization_loss']
             valid_loss += loss.detach().cpu().item()
-        
+            valid_mse_loss += mse_loss.detach().cpu().item() 
+            valid_bce_loss += bce_loss.detach().cpu().item()         
         # save current loss values
         tr_loss, valid_loss = tr_loss/len(train_loader), valid_loss/len(valid_loader)
+        tr_mse_loss, tr_bce_loss = tr_mse_loss/len(train_loader), tr_bce_loss/len(train_loader)
+        valid_mse_loss, valid_bce_loss = valid_mse_loss/len(valid_loader), valid_bce_loss/len(valid_loader)
+        
         logs['tr_loss'].append(tr_loss)
+        logs['tr_bce_loss'].append(tr_bce_loss)
+        logs['tr_mse_loss'].append(tr_mse_loss)
         logs['valid_loss'].append(valid_loss)
-
-        print(f'Epoch [{epoch+1}/{args.epoch}]: training loss= {tr_loss:.6f}, validation loss= {valid_loss:.6f}')
+        logs['valid_bce_loss'].append(valid_bce_loss)
+        logs['valid_mse_loss'].append(valid_mse_loss)
+        
+        print(f'Epoch [{epoch+1}/{args.epoch}]: training loss= {tr_loss:.6f}, training mse loss= {tr_mse_loss:.6f}, training bce loss= {tr_bce_loss:.6f}')
+        print(f'                              : validation loss= {valid_loss:.6f}, validation mse loss= {valid_mse_loss:.6f}, validation bce loss= {valid_bce_loss:.6f}')
         early_stopping(valid_loss, model, epoch, optimizer)
 
         if early_stopping.early_stop:
@@ -148,47 +173,57 @@ def test_regr(args,
           device
           ):
     
-    te_loss_preds = 0
-    te_loss_tot = 0
+    te_tot_loss = 0
+    te_mse_loss = 0
+    te_bce_loss = 0 
+    te_preds_loss = 0
+
     te_r2 = 0
     te_mae = 0
     te_mse = 0
     
     preds = [] # to store predictions
     labels = []
-
+    criterion_mask = nn.BCELoss()
     for batch_idx, x in enumerate(test_loader):
-        x['input'], x['mask'], x['label'] \
-            = x['input'].to(device), x['mask'].to(device), x['label'].to(device)
+        x['input'], x['mask'], x['label'], x['label_mask'] \
+                = x['input'].to(device), x['mask'].to(device), x['label'].to(device), x['label_mask'].to(device)
         
         model.eval()
         loss = 0
         with torch.no_grad():
             out = model(x, args.beta)
-            loss = criterion(out['preds'], x['label'])
-            loss_reg = 0. 
-            tot_loss = loss + loss_reg
+            mse_loss = criterion(out['outs_label'], x['label'])
+            bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
+            loss = mse_loss + bce_loss 
+            preds_loss = criterion(out['preds'], x['label'])
             # store predictions
             preds.append(out['preds'].detach().cpu())
             labels.append(x['label'].detach().cpu())
 
-        te_loss_preds += loss.detach().cpu().numpy()
-        te_loss_tot += tot_loss.detach().cpu().numpy()
+        te_tot_loss += loss.detach().cpu().numpy() 
+        te_mse_loss += mse_loss.detach().cpu().numpy() 
+        te_bce_loss += bce_loss.detach().cpu().numpy()
+        te_preds_loss += preds_loss.detach().cpu().numpy()
 
         te_r2 += r2_score(out['preds'].detach().cpu().numpy().flatten(), x['label'].detach().cpu().numpy().flatten())
         te_mae += mean_absolute_error(out['preds'].detach().cpu().numpy().flatten(), x['label'].detach().cpu().numpy().flatten()) 
         te_mse += mean_squared_error(out['preds'].detach().cpu().numpy().flatten(), x['label'].detach().cpu().numpy().flatten()) 
 
     # te_loss_imp = te_loss_imp/len(test_loader)
-    te_loss_preds = te_loss_preds/len(test_loader)
-    te_loss_tot = te_loss_tot/len(test_loader)
+    te_tot_loss = te_tot_loss/len(test_loader)
+    te_mse_loss = te_mse_loss/len(test_loader) 
+    te_bce_loss = te_bce_loss/len(test_loader) 
+    te_preds_loss = te_preds_loss/len(test_loader)
     te_r2 = te_r2/len(test_loader)
     te_mae = te_mae/len(test_loader)
     te_mse = te_mse/len(test_loader)
     print("Test done!")
     # print(f"imputation loss: {te_loss_imp:.2f}")
-    print(f"prediction loss: {te_loss_preds:.2f}")
-    print(f"total loss: {te_loss_tot:.2f}")
+    print(f"total loss: {te_tot_loss:.2f}")
+    print(f"mse loss: {te_mse_loss:.2f}")
+    print(f"bce loss: {te_bce_loss:.2f}")
+    print(f"prediction loss: {te_preds_loss:.2f}")
     print(f"r2: {te_r2:.2f}")
     print(f"mae: {te_mae:.2f}")
     print(f"mse: {te_mse:.2f}")
