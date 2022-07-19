@@ -77,7 +77,7 @@ def load_skt(args):
 
     for f in tqdm(files, total= len(files)): 
         x = pd.read_csv(f)
-        x = x.iloc[:, 1:-1] 
+        x = x.iloc[:, 1:] 
         x['RSRP'] = -x['RSRP']
         x['RSRQ'] = -x['RSRQ']
         # Time_Stamp,
@@ -161,7 +161,7 @@ def load_skt_without_TA(args):
 
     for f in tqdm(files, total= len(files)): 
         x = pd.read_csv(f)
-        x = x.iloc[:, 1:-2] 
+        x = x.iloc[:, 1:-1] 
         x['RSRP'] = -x['RSRP']
         x['RSRQ'] = -x['RSRQ']
         # RRC_CNT	RRC_FAIL_RATE	

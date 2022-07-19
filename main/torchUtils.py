@@ -148,7 +148,8 @@ def train(args,
         logs['valid_mse_loss'].append(valid_mse_loss)
         
         print(f'Epoch [{epoch+1}/{args.epoch}]: training loss= {tr_loss:.6f}, training mse loss= {tr_mse_loss:.6f}, training bce loss= {tr_bce_loss:.6f}')
-        print(f'                              : validation loss= {valid_loss:.6f}, validation mse loss= {valid_mse_loss:.6f}, validation bce loss= {valid_bce_loss:.6f}')
+        empty = ' '*len(f'Epoch [{epoch+1}/{args.epoch}]')
+        print(f'{empty}: validation loss= {valid_loss:.6f}, validation mse loss= {valid_mse_loss:.6f}, validation bce loss= {valid_bce_loss:.6f}')
         early_stopping(valid_loss, model, epoch, optimizer)
 
         if early_stopping.early_stop:
@@ -297,7 +298,7 @@ def test_regr(args,
         nx.draw_networkx(G, pos=pos, **options)
         plt.savefig(os.path.join(graph_path, f"graph{i}.png"), format="PNG")
         plt.close('all')
-        
+
     perf = {
         'r2': te_r2,
         'mae': te_mae,

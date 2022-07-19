@@ -267,4 +267,4 @@ class HeteroBlock(nn.Module):
         out_tc = self.tc_module(x) 
         x = self.gc_module(out_tc, A, beta= beta)
         x += self.gc_module_t(out_tc, torch.permute(A, (0, 2, 1)), beta= beta)
-        return out_tc, torch.relu(x+res)
+        return out_tc, F.gelu(x+res)
