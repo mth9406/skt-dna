@@ -18,7 +18,7 @@ from matplotlib import pyplot as plt
 from utils import *
 
 class EarlyStopping:
-    """
+    r"""
     Applies early stopping condition... 
     """
     def __init__(self, 

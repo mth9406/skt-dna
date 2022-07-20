@@ -9,7 +9,7 @@ import pickle
 import os
 
 class TimeSeriesDataset(Dataset):
-    """
+    r"""
     Multi-variate time-series dataset
 
     # Parameters
@@ -47,7 +47,7 @@ class TimeSeriesDataset(Dataset):
         return self.X.shape[1]-self.lag
 
 def load_skt(args): 
-    """
+    r"""
     A function to load skt-data.
     
     # Parameters
@@ -137,7 +137,7 @@ def load_skt(args):
     }
 
 def load_skt_without_TA(args): 
-    """
+    r"""
     A function to load skt-data without TA column.
     
     # Parameters

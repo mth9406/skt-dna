@@ -6,7 +6,7 @@ import numpy as np
 from layers import *
 
 def encode_onehot(labels): 
-    """ Encode some relational masks specifying which vertices receive messages from which other ones.
+    r""" Encode some relational masks specifying which vertices receive messages from which other ones.
     # Arguments          
     ___________             
     labels : np.array type 
@@ -38,7 +38,7 @@ def encode_onehot(labels):
     return labels_onehot
 
 def generate_fcn(num_objects, device= None): 
-    """Generates fcn (Fully Connected Graph)
+    r"""Generates fcn (Fully Connected Graph)
     
     # Arguments          
     ___________                
@@ -69,7 +69,7 @@ def generate_fcn(num_objects, device= None):
 
 # Graph Learning Layer - Encoder 
 class GraphLearningEncoder(nn.Module): 
-    """ Encoder module using TemporalConvolutionModule defined in layers.py 
+    r""" Encoder module using TemporalConvolutionModule defined in layers.py 
     # Arguments
     ___________
     num_heteros : int 
@@ -103,7 +103,7 @@ class GraphLearningEncoder(nn.Module):
         return edges
     
     def forward(self, x, rel_rec, rel_send): 
-        """
+        r"""
         # forwards
         __________
         feed-forwards works as follows...     

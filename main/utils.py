@@ -38,7 +38,7 @@ def fft_ifft(f, pad_num, thr= None):
     return ffilt.real
 
 def fourier_imputation(f, mask, window= 100, thr= None):
-    """
+    r"""
     Imputation using Fourier transform
 
     # Parameter

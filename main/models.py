@@ -133,7 +133,7 @@ class HeteroMTGNN(nn.Module):
         }
 
 def gumbel_softmax(logits, tau, hard= True, dim= 1):
-    """
+    r"""
     returns a continuous approximation of the discrete distribution 
     # Arguments   
     ___________       
