@@ -227,7 +227,7 @@ class HeteroNRI(nn.Module):
             nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, groups= num_heteros, padding= 0), 
             nn.BatchNorm2d(num_heteros), 
             nn.GELU(),
-            nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, groups= num_heteros, padding= 0)
+            nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, padding= 0)
             )), 
             nn.GELU()
         )
