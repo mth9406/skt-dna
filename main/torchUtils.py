@@ -314,7 +314,7 @@ def test_regr(args,
             pos = nx.circular_layout(G)
             nx.draw_networkx(G, pos=pos, **options)
             plt.savefig(os.path.join(graph_path, f"graph{i}.png"), format="PNG")
-            plt.close('all')
+        plt.close('all')
 
     perf = {
         'r2': te_r2,
