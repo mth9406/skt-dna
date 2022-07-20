@@ -151,7 +151,7 @@ def kl_categorical_uniform(preds, num_ts, eps=1e-16):
     # if add_const:
     #     const = np.log(num_edge_types)
     #     kl_div += const
-    return kl_div.sum() / (num_ts * preds.size(0))    
+    return -kl_div.sum() / (num_ts * preds.size(0))    
 
 class HeteroNRI(nn.Module): 
     r"""
