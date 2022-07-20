@@ -191,14 +191,15 @@ class GraphConvolutionModule(nn.Module):
     
     def forward(self, x, A, beta= 0.5):
         A_tilde = self.norm_adj(A)
+        A_tilde_after = A_tilde
         # x = self.conv_inter(x)
         hiddens = [x]
         gcl = getattr(self, 'gcl1')
         hiddens.append(gcl(hiddens[-1], x, A_tilde))
         for i in range(2, self.k+1): 
             gcl = getattr(self, f'gcl{i}')
-            A_tilde = torch.bmm(A_tilde.permute(0,2,1), A)
-            hiddens.append(gcl(hiddens[-1], x, A_tilde, beta= beta))
+            A_tilde_after = torch.matmul(torch.transpose(A_tilde_after,-1,-2), A_tilde)
+            hiddens.append(gcl(hiddens[-1], x, A_tilde_after, beta= beta))
         out = 0
         for i in range(self.k+1):
             info_select = getattr(self, f'info_select{i}')
@@ -208,17 +209,19 @@ class GraphConvolutionModule(nn.Module):
     def norm_adj(self, A): 
         """Obtains normalized version of an adjacency matrix
         """
-        assert len(A.shape) == 3 or len(A.shape) == 2, "Improper shape of an adjacency matrix, must be either C x C or C x N x N"
-        with torch.no_grad():
-            if len(A.shape) == 3: 
-                eyes = torch.stack([torch.eye(A.shape[1]) for _ in range(A.shape[0])]).to(device= A.device)
-                D_tilde_inv = torch.diag_embed(1/(1. + torch.sum(A, dim=1))) # C x N x N 
-                A_tilde = D_tilde_inv @ (A + eyes)
-            else: 
-                eye = torch.eye(A.shape[1]).to(A.device)
-                D_tilde_inv = torch.diag(1/(1.+torch.sum(A, dim=1)))
-                A_tilde = D_tilde_inv @ (A + eye)
-        return A_tilde 
+        if len(A.shape) == 3 or len(A.shape) == 2:
+            with torch.no_grad():
+                if len(A.shape) == 3: 
+                    eyes = torch.stack([torch.eye(A.shape[1]) for _ in range(A.shape[0])]).to(device= A.device)
+                    D_tilde_inv = torch.diag_embed(1/(1. + torch.sum(A, dim=1))) # C x N x N 
+                    A_tilde = D_tilde_inv @ (A + eyes)
+                else: 
+                    eye = torch.eye(A.shape[1]).to(A.device)
+                    D_tilde_inv = torch.diag(1/(1.+torch.sum(A, dim=1)))
+                    A_tilde = D_tilde_inv @ (A + eye)
+            return A_tilde 
+        else: 
+            return A
 
 class HeteroBlock(nn.Module):
     """Hetero block 
@@ -266,5 +269,5 @@ class HeteroBlock(nn.Module):
         res = x 
         out_tc = self.tc_module(x) 
         x = self.gc_module(out_tc, A, beta= beta)
-        x += self.gc_module_t(out_tc, torch.permute(A, (0, 2, 1)), beta= beta)
+        x += self.gc_module_t(out_tc, torch.transpose(A, -1, -2), beta= beta)
         return out_tc, F.gelu(x+res)

@@ -37,6 +37,7 @@ parser.add_argument('--cache_file', type= str, default= './data/cache.pickle',
 parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
 parser.add_argument('--epoch', type=int, default=30, help='the number of epochs to train for')
 parser.add_argument('--lr', type=float, default=0.001, help='learning rate')  
+parser.add_argument('--kl_loss_penalty', type= float, default= 0.01, help= 'kl-loss penalty (default= 0.01)')
 parser.add_argument('--patience', type=int, default=30, help='patience of early stopping condition')
 parser.add_argument('--delta', type= float, default=0., help='significant improvement to update a model')
 parser.add_argument('--print_log_option', type= int, default= 10, help= 'print training loss every print_log_option')
@@ -63,13 +64,18 @@ parser.add_argument('--alpha', type= float, default= 3.,
                 help= 'controls saturation rate of tanh: activation function in the graph-learning layer (default= 3.0)')      
 parser.add_argument('--beta', type= float , default= 0.5, 
                 help= 'parameter used in the GraphConvolutionModule, must be in the interval [0,1] (default= 0.5)')
+# only for the heteroNRI
+parser.add_argument('--tau', type= float, default= 1., 
+                help= 'smoothing parameter used in the Gumbel-Softmax, only used in the model: heteroNRI')
+parser.add_argument('--hard', action= 'store_true', 
+                help= 'apply hard coding the the graph (outcome of Gumbel-Softmax), only used in the model: heteroNRI')
 
 # To test
 parser.add_argument('--test', action='store_true', help='test')
 parser.add_argument('--model_file', type= str, default= 'latest_checkpoint.pth.tar'
                     ,help= 'model file', required= False)
 parser.add_argument('--model_type', type= str, default= 'proto', 
-                    help= 'one of: \'proto\', ... ')
+                    help= 'one of: \'proto\', \'heteroNRI\'... ')
 
 parser.add_argument('--num_folds', type= int, default= 1, 
                     help = 'the number of folds')
@@ -124,6 +130,20 @@ def main(args):
             top_k= args.top_k
         ).to(device)
         print('The model is on GPU') if next(model.parameters()).is_cuda else print('The model is on CPU')
+    elif args.model_type == 'heteroNRI':
+        model = HeteroNRI(
+            num_heteros= args.num_heteros,
+            num_ts= args.num_ts,  
+            time_lags= args.lag, 
+            num_blocks= args.num_blocks, 
+            k= args.k, 
+            embedding_dim= args.embedding_dim,
+            device= device,
+            alpha= args.alpha,
+            top_k= args.top_k,
+            tau= args.tau, 
+            hard= args.hard            
+        ).to(device)
     else:
         print("The model is yet to be implemented.")
         sys.exit()

@@ -98,6 +98,8 @@ def train(args,
                 mse_loss = criterion(out['outs_label'], x['label'])
                 bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
                 loss = mse_loss + bce_loss
+                if out['kl_loss'] is not None: 
+                    loss += args.kl_loss_penalty * out['kl_loss']
                 # if out['regularization_loss'] is not None: 
                 #     loss += args.reg_loss_penalty * out['regularization_loss']
             
@@ -129,9 +131,8 @@ def train(args,
                 mse_loss = criterion(out['outs_label'], x['label'])
                 bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
                 loss = mse_loss + bce_loss
-                # loss = criterion(out['preds'], x['label'])
-                # if out['regularization_loss'] is not None: 
-                #     loss += args.reg_loss_penalty * out['regularization_loss']
+                if out['kl_loss'] is not None: 
+                    loss += args.kl_loss_penalty * out['kl_loss']
             valid_loss += loss.detach().cpu().item()
             valid_mse_loss += mse_loss.detach().cpu().item() 
             valid_bce_loss += bce_loss.detach().cpu().item()         
@@ -185,6 +186,8 @@ def test_regr(args,
     
     preds = [] # to store predictions
     labels = []
+    graphs = [] 
+
     criterion_mask = nn.BCELoss()
     for batch_idx, x in enumerate(test_loader):
         x['input'], x['mask'], x['label'], x['label_mask'] \
@@ -197,10 +200,14 @@ def test_regr(args,
             mse_loss = criterion(out['outs_label'], x['label'])
             bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
             loss = mse_loss + bce_loss 
+            if out['kl_loss'] is not None: 
+                loss += args.kl_loss_penalty * out['kl_loss']
             preds_loss = criterion(out['preds'], x['label'])
             # store predictions
-            preds.append(out['preds'].detach().cpu())
-            labels.append(x['label'].detach().cpu())
+            preds.append(out['preds'].detach().cpu()) # bs, c, 1, n
+            labels.append(x['label'].detach().cpu()) # bs, c, 1, n
+            if out['adj_mat'] is not None: 
+                graphs.append(out['adj_mat'].detach().cpu()) # bs, c, n, n
 
         te_tot_loss += loss.detach().cpu().numpy() 
         te_mse_loss += mse_loss.detach().cpu().numpy() 
@@ -244,6 +251,11 @@ def test_regr(args,
     if args.cache is not None: 
         labels = inv_min_max_scaler(labels, args.cache, args.columns)
     
+    if len(graphs) > 0: 
+        graphs = torch.concat(graphs, dim=0) # num_obs, num_cells, num_time_series, num_time_series
+        graphs = torch.permute(graphs, (1, 0, 2, 3)) # num_cells, num_obs, num_time_series, num_time_series
+        graphs = graphs.numpy() 
+    
     num_cells = labels.shape[0]
 
     # make a path to save a figures 
@@ -276,13 +288,13 @@ def test_regr(args,
     idx = torch.LongTensor(np.arange(len(args.columns))).to(device)
     for i in tqdm(range(num_cells), total= num_cells):
         write_csv(args, 'test/predictions', f'predictions{i}.csv', preds[i, ...], args.columns)
-        write_csv(args, 'test/labels', f'labels{i}.csv', labels[i, ...], args.columns) 
+        write_csv(args, 'test/labels', f'labels{i}.csv', labels[i, ...], args.columns)   
         
         fig, axes = plt.subplots(len(args.columns), 1, figsize= (10,3*len(args.columns)))
 
         for j in range(len(args.columns)):
             col_name = args.columns[j]
-            fig.axes[j].set_title(f'time-sereis plot: {col_name}')
+            fig.axes[j].set_title(f'time-seris plot: {col_name}')
             fig.axes[j].plot(preds[i,:,j], label= 'prediction')
             fig.axes[j].plot(labels[i,:,j], label= 'label')
             fig.axes[j].legend()
@@ -292,16 +304,17 @@ def test_regr(args,
         fig_file = os.path.join(fig_path, f'figure{i}.png')
         fig.savefig(fig_file)
 
-        adj_mat = model.gen_adj[i](idx).data.cpu().numpy() 
-        adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
-        plt.figure(figsize =(15,15))
-        # plt.xkcd()
-        G = nx.from_pandas_adjacency(adj_mat)
-        G = nx.DiGraph(G)
-        pos = nx.circular_layout(G)
-        nx.draw_networkx(G, pos=pos, **options)
-        plt.savefig(os.path.join(graph_path, f"graph{i}.png"), format="PNG")
-        plt.close('all')
+        if args.model_type == 'proto': 
+            adj_mat = model.gen_adj[i](idx).data.cpu().numpy() 
+            adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
+            plt.figure(figsize =(15,15))
+            # plt.xkcd()
+            G = nx.from_pandas_adjacency(adj_mat)
+            G = nx.DiGraph(G)
+            pos = nx.circular_layout(G)
+            nx.draw_networkx(G, pos=pos, **options)
+            plt.savefig(os.path.join(graph_path, f"graph{i}.png"), format="PNG")
+            plt.close('all')
 
     perf = {
         'r2': te_r2,
