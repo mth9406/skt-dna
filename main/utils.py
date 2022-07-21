@@ -18,6 +18,14 @@ def inv_min_max_scaler(X, cache, columns):
     max = cache['max'][columns].values[np.newaxis, :]
     return (max-min)*X + min
 
+def min_max_scaler_ver2(X, cache, columns): 
+    return 2*(X-cache['min'][columns])/(cache['max'][columns]-cache['min'][columns]) - 1
+
+def inv_min_max_scaler_ver2(X, cache, columns): 
+    min = cache['min'][columns].values[np.newaxis, :]
+    max = cache['max'][columns].values[np.newaxis, :]
+    return (X+1)/2 *(max-min) + min
+
 def fft_ifft(f, pad_num, thr= None):
     t = np.arange(0, len(f))
     n = len(f) 

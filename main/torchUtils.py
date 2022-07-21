@@ -243,13 +243,13 @@ def test_regr(args,
     preds = torch.permute(torch.squeeze(preds), (1, 0, 2)) # num_cells, num_obs, num_time_series 
     preds = preds.numpy()
     if args.cache is not None: 
-        preds = inv_min_max_scaler(preds, args.cache, args.columns)
+        preds = inv_min_max_scaler_ver2(preds, args.cache, args.columns)
 
     labels = torch.concat(labels, dim=0) # num_obs, num_cells, num_time_series, 1
     labels = torch.permute(torch.squeeze(labels), (1, 0, 2)) # num_cells, num_obs, num_time_series
     labels = labels.numpy()
     if args.cache is not None: 
-        labels = inv_min_max_scaler(labels, args.cache, args.columns)
+        labels = inv_min_max_scaler_ver2(labels, args.cache, args.columns)
     
     if len(graphs) > 0: 
         graphs = torch.concat(graphs, dim=0) # num_obs, num_cells, num_time_series, num_time_series
@@ -314,6 +314,21 @@ def test_regr(args,
             pos = nx.circular_layout(G)
             nx.draw_networkx(G, pos=pos, **options)
             plt.savefig(os.path.join(graph_path, f"graph{i}.png"), format="PNG")
+        elif args.model_type == 'heteroNRI':
+            graph_path = os.path.join(args.model_path, f'test/graphs/enb{i}')
+            os.makedirs(graph_path, exist_ok= True)
+            plt.figure(figsize =(15,15))
+            for j in range(12):
+                # num_obs, num_time_series, num_time_series
+                graph_file = os.path.join(graph_path, f'enb{i}_graph_{j}.png') 
+                adj_mat = graphs[i, j, ...] # num_time_series, num_time_series 
+                adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
+                G = nx.from_pandas_adjacency(adj_mat)
+                G = nx.DiGraph(G)
+                pos = nx.circular_layout(G)
+                nx.draw_networkx(G, pos=pos, **options)
+                plt.savefig(graph_file, format="PNG")
+                plt.close('all')
         plt.close('all')
 
     perf = {
