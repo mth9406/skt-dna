@@ -92,7 +92,8 @@ def load_skt(args):
     for f in tqdm(files, total= len(files)): 
         x = pd.read_csv(f)
         x = x.iloc[:, 1:]
-        x = min_max_scaler(x, cache, columns= args.columns) if cache is not None else x 
+        # x = min_max_scaler(x, cache, columns= args.columns) if cache is not None else x 
+        x = min_max_scaler_ver2(x, cache, columns= args.columns) if cache is not None else x 
         # Time_Stamp,
         # RRC_CNT, RRC_FAIL_RATE, CALL_RELEASE_ANOMALY_CNT,
         # DL_PRB, CQI, RSRP, RSRQ, 
@@ -182,7 +183,8 @@ def load_skt_without_TA(args):
     for f in tqdm(files, total= len(files)): 
         x = pd.read_csv(f)
         x = x.iloc[:, 1:-1]
-        x = min_max_scaler(x, cache, columns= args.columns) if cache is not None else x 
+        # x = min_max_scaler(x, cache, columns= args.columns) if cache is not None else x 
+        x = min_max_scaler_ver2(x, cache, columns= args.columns) if cache is not None else x 
         # Time_Stamp,
         # RRC_CNT, RRC_FAIL_RATE, CALL_RELEASE_ANOMALY_CNT,
         # DL_PRB, CQI, RSRP, RSRQ, 
