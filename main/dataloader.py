@@ -49,7 +49,12 @@ class TimeSeriesDataset(Dataset):
 def load_skt(args): 
     r"""
     A function to load skt-data.
-    
+    args will have the following items after running this function.
+    * decoder: a dictionary which maps idx: enb 
+    * columns: a list of columns of the 'skt' data 
+    * num_heteros: the number of eNB
+    * num_ts: the number of time-series (= the dimension of 'measurement')
+    * time_stamps: time-stamps of test data
     # Parameters
     ____________
     args contains the followings...
@@ -92,9 +97,11 @@ def load_skt(args):
         cache = None
     args.cache= cache
 
-    for f in tqdm(files, total= len(files)): 
+    for i, f in tqdm(enumerate(files), total= len(files)): 
         x = pd.read_csv(f)
         x = x.iloc[:, 1:]
+        if i == 0: 
+            args.time_stamps = x.iloc[:, 0].values # time_stamps
         # x = min_max_scaler(x, cache, columns= args.columns) if cache is not None else x 
         x = min_max_scaler_ver2(x, cache, columns= args.columns) if cache is not None else x 
         # Time_Stamp,
@@ -134,6 +141,7 @@ def load_skt(args):
     M_train, M_valid, M_test\
          = M[:, :start_idx_val, :], M[:, start_idx_val:start_idx_te, :], M[:, start_idx_te:, :]
 
+    args.time_stamps = args.time_stamps[start_idx_te:]
     return {
         "train": [X_train, M_train],
         "valid": [X_valid, M_valid],
@@ -186,9 +194,11 @@ def load_skt_without_TA(args):
         cache = None
     args.cache= cache
 
-    for f in tqdm(files, total= len(files)): 
+    for i, f in tqdm(enumerate(files), total= len(files)): 
         x = pd.read_csv(f)
         x = x.iloc[:, 1:-1]
+        if i == 0: 
+            args.time_stamps = x.iloc[:, 0].values
         # x = min_max_scaler(x, cache, columns= args.columns) if cache is not None else x 
         x = min_max_scaler_ver2(x, cache, columns= args.columns) if cache is not None else x 
         # Time_Stamp,
@@ -227,7 +237,8 @@ def load_skt_without_TA(args):
 
     M_train, M_valid, M_test\
          = M[:, :start_idx_val, :], M[:, start_idx_val:start_idx_te, :], M[:, start_idx_te:, :]
-
+         
+    args.time_stamps = args.time_stamps[start_idx_te:]
     return {
         "train": [X_train, M_train],
         "valid": [X_valid, M_valid],
