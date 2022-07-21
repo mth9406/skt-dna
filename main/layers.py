@@ -7,7 +7,7 @@ from utils import *
 def make_input_n_mask_pairs(x, device): 
     r"""A fucntion to make pairs of input-mask
 
-    # Parameters
+    # Arguments
     ____________
     x : dict 
         x['input']: input time-series
@@ -32,7 +32,7 @@ def make_input_n_mask_pairs(x, device):
 class ResidualAdd(nn.Module):
     r"""Residual connection
 
-    # Parameters
+    # Arguments
     ____________
     fn : sub-class of nn.Module          
     
@@ -167,7 +167,7 @@ class InformationPropagtionLayer(nn.Module):
 # graph convolution module 
 class GraphConvolutionModule(nn.Module): 
     r"""Graph convolution module
-    # Parameters
+    # Arguments
     ____________
     in_features : int
         dimension of the input tensor

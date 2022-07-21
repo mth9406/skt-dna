@@ -12,7 +12,7 @@ class TimeSeriesDataset(Dataset):
     r"""
     Multi-variate time-series dataset
 
-    # Parameters
+    # Arguments
     ____________
     X: input multi-variate time-series data (FloatTensor)
     M: mask, {0,1} to represent missing value (FloatTensor)
