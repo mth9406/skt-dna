@@ -184,7 +184,7 @@ class GraphConvolutionModule(nn.Module):
             setattr(self, f'gcl{i}', InformationPropagtionLayer())
 
         for i in range(k+1): 
-            setattr(self, f'info_select{i}', nn.Conv2d(out_features, out_features, 1,1,0,1,1, **kwargs))
+            setattr(self, f'info_select{i}', nn.Conv2d(out_features, out_features, 1,1,0,1, groups= out_features, bias= False, **kwargs))
         
         self.in_features, self.out_features, self.k\
             = in_features, out_features, k
