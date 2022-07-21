@@ -287,8 +287,9 @@ def test_regr(args,
     }
     idx = torch.LongTensor(np.arange(len(args.columns))).to(device)
     for i in tqdm(range(num_cells), total= num_cells):
-        write_csv(args, 'test/predictions', f'predictions{i}.csv', preds[i, ...], args.columns)
-        write_csv(args, 'test/labels', f'labels{i}.csv', labels[i, ...], args.columns)   
+        enb_id = args.decoder.get(i)
+        write_csv(args, 'test/predictions', f'predictions_{enb_id}.csv', preds[i, ...], args.columns)
+        write_csv(args, 'test/labels', f'labels_{enb_id}.csv', labels[i, ...], args.columns)   
         
         fig, axes = plt.subplots(len(args.columns), 1, figsize= (10,3*len(args.columns)))
 
@@ -299,9 +300,9 @@ def test_regr(args,
             fig.axes[j].plot(labels[i,:,j], label= 'label')
             fig.axes[j].legend()
 
-        fig.suptitle(f"Prediction and True label plot of {i}th cell/eNB", fontsize=20, position= (0.5, 1.0+0.05))
+        fig.suptitle(f"Prediction and True label plot of {enb_id}", fontsize=20, position= (0.5, 1.0+0.05))
         fig.tight_layout()
-        fig_file = os.path.join(fig_path, f'figure{i}.png')
+        fig_file = os.path.join(fig_path, f'figure_{enb_id}.png')
         fig.savefig(fig_file)
 
         if args.model_type == 'proto': 
@@ -313,14 +314,14 @@ def test_regr(args,
             G = nx.DiGraph(G)
             pos = nx.circular_layout(G)
             nx.draw_networkx(G, pos=pos, **options)
-            plt.savefig(os.path.join(graph_path, f"graph{i}.png"), format="PNG")
+            plt.savefig(os.path.join(graph_path, f"graph_{enb_id}.png"), format="PNG")
         elif args.model_type == 'heteroNRI':
-            graph_path = os.path.join(args.model_path, f'test/graphs/enb{i}')
+            graph_path = os.path.join(args.model_path, f'test/graphs/{enb_id}')
             os.makedirs(graph_path, exist_ok= True)
             plt.figure(figsize =(15,15))
             for j in range(12):
                 # num_obs, num_time_series, num_time_series
-                graph_file = os.path.join(graph_path, f'enb{i}_graph_{j}.png') 
+                graph_file = os.path.join(graph_path, f'{enb_id}_graph_{j}.png') 
                 adj_mat = graphs[i, j, ...] # num_time_series, num_time_series 
                 adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
                 G = nx.from_pandas_adjacency(adj_mat)
@@ -328,7 +329,7 @@ def test_regr(args,
                 pos = nx.circular_layout(G)
                 nx.draw_networkx(G, pos=pos, **options)
                 plt.savefig(graph_file, format="PNG")
-                # plt.close('all')
+            # plt.close('all')
         plt.close('all')
 
     perf = {

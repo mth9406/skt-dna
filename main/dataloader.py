@@ -70,7 +70,10 @@ def load_skt(args):
     # data_path 
     all_files = [os.path.join(args.data_path, f) for f in os.listdir(args.data_path)]
     files = list(filter(lambda f: f.endswith('.csv'), all_files))
-
+    # decoder: idx: enb
+    args.decoder = {
+        idx: os.path.split(f)[-1][:-4] for idx, f in enumerate(files)
+    }
     # (1) load data and generate mask...
     # {1, 0} 1 for missing, 0 for not missing
     X = []
@@ -161,7 +164,10 @@ def load_skt_without_TA(args):
     # data_path 
     all_files = [os.path.join(args.data_path, f) for f in os.listdir(args.data_path)]
     files = list(filter(lambda f: f.endswith('.csv'), all_files))
-
+    # decoder: idx: enb
+    args.decoder = {
+        idx: os.path.split(f)[-1][:-4] for idx, f in enumerate(files)
+    }
     # (1) load data and generate mask...
     # {1, 0} 1 for missing, 0 for not missing
     X = []
