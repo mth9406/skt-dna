@@ -68,16 +68,51 @@ class ProjectionConv1x1Layer(nn.Module):
         """
         return self.projection(pair)
 
+class CausalDilatedVerticalConv1d(nn.Module): 
+    r"""Causal dilated convoltion
+    Causal dilated convolution is based on the work by
+    \"""
+    Oord, A. V. D., Dieleman, S., Zen, H., Simonyan, K., Vinyals, O., Graves, A., ... & Kavukcuoglu, K. (2016). 
+    Wavenet: A generative model for raw audio. 
+    arXiv preprint arXiv:1609.03499.
+    \"""
+    This module only defers from the original work inthat 
+    (1) it is a group-wise convolution 
+    (2) the kernel 'moves' vertically.
+    """
+    def __init__(self, 
+                in_channels, out_channels, 
+                kernel_size,  
+                groups, dilation, 
+                **kwargs
+                ): 
+        assert kernel_size[1] == 1, "kernel[1] should have size 1."
+        super().__init__()
+        self.pad = (kernel_size[0] - 1) * dilation 
+        self.causal_conv = nn.Conv2d(in_channels, out_channels, kernel_size, 
+                                        padding= (self.pad, 0), dilation= dilation, groups= groups, **kwargs)
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels
+        self.kernel_size = kernel_size 
+        self.groups = groups 
+        self.dilation = dilation
+
+    def forward(self, x): 
+        x = self.causal_conv(x) 
+        x = x[..., :-self.causal_conv.padding[0], :] if self.pad > 0 else x
+        return x
+
 # temporal convolution layer
 class DilatedInceptionLayer(nn.Module):
     r"""Dilated inception layer
     """
     def __init__(self, in_channels, out_channels, **kwargs):
         super().__init__()
-        self.branch1x1 = nn.Conv2d(in_channels, out_channels, kernel_size= (1,1), padding= (0,0), groups= in_channels, dilation= 1, **kwargs)
-        self.branch1x3 = nn.Conv2d(in_channels, out_channels, kernel_size= (3,1), padding= (1,0), groups= in_channels, dilation= 1, **kwargs)
-        self.branch1x5 = nn.Conv2d(in_channels, out_channels, kernel_size= (3,1), padding= (2,0), groups= in_channels, dilation= 2, **kwargs)
-        self.branch1x7 = nn.Conv2d(in_channels, out_channels, kernel_size= (3,1), padding= (3,0), groups= in_channels, dilation= 3, **kwargs)
+        self.branch1x1 = CausalDilatedVerticalConv1d(in_channels, out_channels, (1,1), in_channels, 1, **kwargs)
+        self.branch3x1 = CausalDilatedVerticalConv1d(in_channels, out_channels, (3,1), in_channels, 1, **kwargs)
+        self.branch5x1 = CausalDilatedVerticalConv1d(in_channels, out_channels, (3,1), in_channels, 2, **kwargs)
+        self.branch7x1 = CausalDilatedVerticalConv1d(in_channels, out_channels, (3,1), in_channels, 3, **kwargs)
 
         self.in_channels, self.out_channels = in_channels, out_channels
 
@@ -85,7 +120,7 @@ class DilatedInceptionLayer(nn.Module):
         b, c, n, p = x.shape
         outs = torch.zeros(b, 4*c, n, p).to(x.device)
         for i in range(4): 
-            branch = getattr(self, f'branch1x{2*i+1}')
+            branch = getattr(self, f'branch{2*i+1}x1')
             outs[:, i::4, ...] = branch(x) 
             # we have c groups of receptive channels...
             # = 4 channels form one group.
@@ -107,39 +142,6 @@ class TemporalConvolutionModule(nn.Module):
         out_gate = torch.sigmoid(self.dil_gate(x)) 
         out = out_filter*out_gate
         return self.conv_inter(out)        
-
-# graph learning layer 
-class AdjConstructor(nn.Module): 
-    r"""Constructs an adjacency matrix
-
-    n_nodes: the number of nodes (node= cell)
-    embedding_dim: dimension of the embedding vector
-    """
-    def __init__(self, n_nodes, embedding_dim, alpha= 3., top_k= 4): 
-        super().__init__()
-        self.emb1 = nn.Embedding(n_nodes, embedding_dim=embedding_dim)
-        self.emb2 = nn.Embedding(n_nodes, embedding_dim=embedding_dim)
-        self.theta1 = nn.Linear(embedding_dim, embedding_dim)
-        self.theta2 = nn.Linear(embedding_dim, embedding_dim)
-        self.alpha = alpha # controls saturation rate of tanh: activation function.
-        self.top_k = top_k
-    def forward(self, idx):
-        emb1 = self.emb1(idx) 
-        emb2 = self.emb2(idx) 
-
-        emb1 = torch.tanh(self.alpha * self.theta1(emb1))
-        emb2 = torch.tanh(self.alpha * self.theta2(emb2))
-
-        adj_mat = torch.relu(torch.tanh(self.alpha*(emb1@emb2.T - emb2@emb1.T))) # adjacency matrix
-        mask = torch.zeros(idx.size(0), idx.size(0)).to(idx.device) 
-        mask.fill_(float('0'))
-        if self.training:
-            s1, t1 = (adj_mat + torch.rand_like(adj_mat)*0.01).topk(self.top_k, 1) # values, indices
-        else: 
-            s1, t1 = adj_mat.topk(self.top_k, 1)
-        mask.scatter_(1, t1, s1.fill_(1))
-        adj_mat = adj_mat * mask 
-        return adj_mat
 
 # graph convolution layer 
 class InformationPropagtionLayer(nn.Module): 

@@ -5,6 +5,39 @@ import numpy as np
 
 from layers import *
 
+# graph learning layer from connecting the dots.
+class AdjConstructor(nn.Module): 
+    r"""Constructs an adjacency matrix
+
+    n_nodes: the number of nodes (node= cell)
+    embedding_dim: dimension of the embedding vector
+    """
+    def __init__(self, n_nodes, embedding_dim, alpha= 3., top_k= 4): 
+        super().__init__()
+        self.emb1 = nn.Embedding(n_nodes, embedding_dim=embedding_dim)
+        self.emb2 = nn.Embedding(n_nodes, embedding_dim=embedding_dim)
+        self.theta1 = nn.Linear(embedding_dim, embedding_dim)
+        self.theta2 = nn.Linear(embedding_dim, embedding_dim)
+        self.alpha = alpha # controls saturation rate of tanh: activation function.
+        self.top_k = top_k
+    def forward(self, idx):
+        emb1 = self.emb1(idx) 
+        emb2 = self.emb2(idx) 
+
+        emb1 = torch.tanh(self.alpha * self.theta1(emb1))
+        emb2 = torch.tanh(self.alpha * self.theta2(emb2))
+
+        adj_mat = torch.relu(torch.tanh(self.alpha*(emb1@emb2.T - emb2@emb1.T))) # adjacency matrix
+        mask = torch.zeros(idx.size(0), idx.size(0)).to(idx.device) 
+        mask.fill_(float('0'))
+        if self.training:
+            s1, t1 = (adj_mat + torch.rand_like(adj_mat)*0.01).topk(self.top_k, 1) # values, indices
+        else: 
+            s1, t1 = adj_mat.topk(self.top_k, 1)
+        mask.scatter_(1, t1, s1.fill_(1))
+        adj_mat = adj_mat * mask 
+        return adj_mat
+
 def encode_onehot(labels): 
     r""" Encode some relational masks specifying which vertices receive messages from which other ones.
     # Arguments          
