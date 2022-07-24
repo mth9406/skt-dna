@@ -117,7 +117,9 @@ class GraphLearningEncoder(nn.Module):
         super().__init__() 
         self.num_heteros = num_heteros
         self.time_lags = time_lags
-        self.tcm = nn.Sequential(TemporalConvolutionModule(num_heteros, num_heteros, num_heteros=num_heteros, **kwargs),nn.Conv2d(num_heteros, num_heteros, (time_lags, 1))) 
+        self.tcm = nn.Sequential(
+            TemporalConvolutionModule(num_heteros, num_heteros, num_heteros=num_heteros, **kwargs),
+            nn.Conv2d(num_heteros, num_heteros, (time_lags, 1), groups= num_heteros)) 
         self.node2edge_conv = nn.Conv2d(num_heteros, num_heteros, (1, 2), groups= num_heteros)
         self.edge2node_conv = nn.Conv2d(num_heteros, num_heteros, (1, 1), groups= num_heteros)
         self.node2edge_conv_2 = nn.Conv2d(num_heteros, num_heteros, (1, 3), groups= num_heteros) 
@@ -224,7 +226,7 @@ class GraphLearningEncoderModule(nn.Module):
             rel_rec.append(rec); rel_send.append(send) 
         self.rel_rec = torch.stack(rel_rec, dim= 0).to(device)
         self.rel_send = torch.stack(rel_send, dim= 0).to(device)
-
+        
         self.gle = GraphLearningEncoder(num_heteros, time_lags, **kwargs) 
         self.num_heteros, self.time_lags, self.num_ts = num_heteros, time_lags, num_ts
         # self.tau = tau
