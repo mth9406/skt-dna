@@ -1,6 +1,7 @@
 import os
 import sys
 import argparse
+import json 
 
 import torch
 import numpy as np
@@ -43,11 +44,6 @@ parser.add_argument('--delta', type= float, default=0., help='significant improv
 parser.add_argument('--print_log_option', type= int, default= 10, help= 'print training loss every print_log_option')
 parser.add_argument('--verbose', action= 'store_true', 
                     help= 'print logs about early-stopping')
-# parser.add_argument('--reg_loss_penalty', type= float, default= 1e-2,
-#                     help= 'loss-penalty term of regularization if any. (default: 1e-2)')
-# parser.add_argument('--kl_weight', type= float, default= 0.1, help= 'kl-loss of vibi (default = 0.1)')
-# parser.add_argument('--gradient_max_norm', type= float, default= 5,
-#                     help= 'clips gradient norm of an iterable of parameters by \"gradient_max_norm\"')
 
 # model options
 parser.add_argument('--model_path', type= str, default= './data/skt/model',
@@ -92,6 +88,11 @@ if not os.path.exists(args.model_path):
     os.makedirs(args.model_path, exist_ok= True)
 else:
     print("The path already exists, skip making the path...")
+
+print(f'saving the commandline arguments in the path: {args.model_path}...')
+args_file = os.path.join(args.model_path, 'commandline_args.txt')
+with open(args_file, 'w') as f:
+    json.dump(args.__dict__, f, indent=2)
 
 def main(args):
     # read data

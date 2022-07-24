@@ -130,8 +130,8 @@ class GraphLearningEncoder(nn.Module):
 
     def node2edge(self, x, rel_rec, rel_send):
         # fully-connected-graph
-        receivers = torch.matmul(rel_rec, x) # (c, n, n^2) x (bs, c, n, 1) --> (bs, c, n^2, 1)
-        senders = torch.matmul(rel_send, x) # (c, n, n^2) x (bs, c, n, 1) --> (bs, c, n^2, 1)
+        receivers = torch.matmul(rel_rec, x) # (c, n^2, n) x (bs, c, n, 1) --> (bs, c, n^2, 1)
+        senders = torch.matmul(rel_send, x) # (c, n^2, n) x (bs, c, n, 1) --> (bs, c, n^2, 1)
         edges = torch.cat([senders, receivers], dim=-1) # (bs, c, n^2, 2)
         return edges
     

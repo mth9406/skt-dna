@@ -185,9 +185,7 @@ class HeteroNRI(nn.Module):
         controls saturation rate of tanh: activation function in the graph-learning layer
         default = 3.0   
     tau: float 
-        softmax temperature - a parameter that controls the smoothness of the samples   
-    hard: bool 
-        hard sampling if set true     
+        softmax temperature - a parameter that controls the smoothness of the samples       
     kwargs : key word arguments
         * groups
         * drop_p 
@@ -251,8 +249,7 @@ class HeteroNRI(nn.Module):
         self.alpha = alpha 
         self.embedding_dim = embedding_dim
         # encoder arguments
-        self.tau = tau 
-        self.hard = hard  
+        self.tau = tau  
         # device
         self.device= device 
         
@@ -264,7 +261,10 @@ class HeteroNRI(nn.Module):
         z = F.softmax(h, dim= -2) # softmax along row dimension. (col-sum = 1.)
         # obtain kl_loss 
         kl_loss = kl_categorical_uniform(z, self.num_ts)
-        A = gumbel_softmax(h, self.tau, self.hard, dim=1)
+        if self.training: 
+            A = gumbel_softmax(h, self.tau, hard= False, dim=1)
+        else: 
+            A = gumbel_softmax(h, self.tau, hard= True, dim=1)
         # decoder 
         x_batch = self.projection(x_batch) 
         bs, c, t, n = x_batch.shape 
