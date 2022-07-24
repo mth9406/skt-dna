@@ -262,9 +262,9 @@ class HeteroNRI(nn.Module):
         # obtain kl_loss 
         kl_loss = kl_categorical_uniform(z, self.num_ts)
         if self.training: 
-            A = gumbel_softmax(h, self.tau, hard= False, dim=1)
+            A = gumbel_softmax(h, self.tau, hard= False, dim=-2)
         else: 
-            A = gumbel_softmax(h, self.tau, hard= True, dim=1)
+            A = gumbel_softmax(h, self.tau, hard= True, dim=-2)
         # decoder 
         x_batch = self.projection(x_batch) 
         bs, c, t, n = x_batch.shape 
