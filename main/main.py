@@ -138,12 +138,18 @@ def main(args):
             time_lags= args.lag, 
             num_blocks= args.num_blocks, 
             k= args.k, 
-            embedding_dim= args.embedding_dim,
             device= device,
-            alpha= args.alpha,
-            top_k= args.top_k,
-            tau= args.tau, 
-            hard= args.hard            
+            tau= args.tau,           
+        ).to(device)
+    elif args.model_type == 'heteroSpatialNRI': 
+        model = HeteroSpatialNRI(
+            num_heteros= args.num_heteros,
+            num_ts = args.num_ts, 
+            time_lags = args.lag, 
+            num_blocks = args.num_blocks,
+            k= args.k, 
+            tau= args.tau,
+            device= device
         ).to(device)
     else:
         print("The model is yet to be implemented.")

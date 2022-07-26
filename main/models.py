@@ -177,13 +177,6 @@ class HeteroNRI(nn.Module):
         the number of the HeteroBlocks 
     k : int
         the number of layers at every GC-Module
-    embedding_dim : int
-        the size of embedding dimesion in the graph-learning layer 
-    top_k : int
-        top_k to select as non-zero in the adjacency matrix      
-    alpha : float
-        controls saturation rate of tanh: activation function in the graph-learning layer
-        default = 3.0   
     tau: float 
         softmax temperature - a parameter that controls the smoothness of the samples       
     kwargs : key word arguments
@@ -198,11 +191,9 @@ class HeteroNRI(nn.Module):
                 time_lags: int, 
                 num_blocks:int, 
                 k:int, 
-                embedding_dim: int, 
                 tau:float, 
-                hard: bool, 
                 device, 
-                alpha: float = 3.0, top_k: int = 4, **kwargs):
+                **kwargs):
         super().__init__() 
         
         # encoder 
@@ -245,9 +236,6 @@ class HeteroNRI(nn.Module):
         self.time_lags = time_lags 
         self.num_blocks = num_blocks 
         self.k = k 
-        self.top_k = top_k
-        self.alpha = alpha 
-        self.embedding_dim = embedding_dim
         # encoder arguments
         self.tau = tau  
         # device
@@ -293,4 +281,168 @@ class HeteroNRI(nn.Module):
             'outs_mask': outs_mask, 
             'kl_loss': kl_loss, 
             'adj_mat': A
+        }
+
+class HeteroSpatialNRI(nn.Module): 
+    r"""
+    
+    This work is based on the work by 
+    
+    \"""
+    Kipf, T., Fetaya, E., Wang, K. C., Welling, M., & Zemel, R. (2018, July). 
+    Neural relational inference for interacting systems. 
+    In International Conference on Machine Learning (pp. 2688-2697). PMLR.
+    \"""
+
+    It differs from the HeteroNRI in-that it considers inter-eNB relationship.
+
+    # Arguments 
+    ___________
+    num_heteros : int 
+        the number of heterogeneous groups (stack along the channel dimension)
+    num_ts : int
+        the number of time-series 
+        should be 10 for the skt-data
+    time_lags : int 
+        the size of 'time_lags'
+    num_blocks : int
+        the number of the HeteroBlocks 
+    k : int
+        the number of layers at every GC-Module
+    tau: float 
+        softmax temperature - a parameter that controls the smoothness of the samples       
+    kwargs : key word arguments
+        * groups
+        * drop_p 
+        * ...
+    """
+
+    def __init__(self, 
+                num_heteros:int,
+                num_ts: int,  
+                time_lags: int, 
+                num_blocks:int, 
+                k:int, 
+                tau:float, 
+                device, 
+                **kwargs):
+        super().__init__() 
+        
+        # encoder 
+        self.glem = GraphLearningEncoderModule(num_heteros, time_lags, num_ts, device)
+        
+        # eNB-graph 
+        # todo 
+        self.eNB_adj = GraphLearningEncoderModule(1, time_lags, num_heteros, device, **kwargs)
+
+        # decoder
+        # projection layer
+        self.projection = ProjectionConv1x1Layer(num_heteros, num_heteros, groups= num_heteros, **kwargs)
+        # hetero blocks
+        for i in range(num_blocks): 
+            setattr(self, f'hetero_block{i}', HeteroBlock(num_heteros, k, **kwargs))
+
+        # output_module
+        # self.fc_out = nn.Conv2d(num_heteros, num_heteros, (1, time_lags), padding= 0)
+        self.fc_decode = nn.Sequential(
+            nn.Conv2d(num_heteros*(num_blocks+2), num_heteros, kernel_size=1,  groups= num_heteros, padding= 0), 
+            nn.BatchNorm2d(num_heteros),
+            nn.GELU(), 
+            ResidualAdd(nn.Sequential(
+            nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, groups= num_heteros, padding= 0), 
+            nn.BatchNorm2d(num_heteros), 
+            nn.GELU(),
+            nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, padding= 0)
+            )), 
+            nn.GELU()
+        )
+
+        self.eNB_emb = nn.Sequential(
+            nn.Conv2d(num_heteros, num_heteros, (1, num_ts), groups= num_heteros),
+            nn.BatchNorm2d(num_heteros),
+            nn.GELU()
+        )
+        
+        self.fc_out = nn.Sequential(
+            nn.Conv2d(num_heteros, num_heteros, kernel_size= (time_lags,1), groups= num_heteros, padding= 0), 
+            nn.Tanh()
+        )
+            
+        self.mask_block = nn.Sequential(
+            ResidualAdd(TemporalConvolutionModule(num_heteros, num_heteros, num_heteros)),
+            nn.Conv2d(num_heteros, num_heteros, kernel_size=(time_lags,1), groups= num_heteros)
+        )
+
+        # decoder arguments
+        self.num_heteros = num_heteros
+        self.num_ts = num_ts 
+        self.time_lags = time_lags 
+        self.num_blocks = num_blocks 
+        self.k = k 
+        # encoder arguments
+        self.tau = tau  
+        # device
+        self.device= device 
+        
+    def forward(self, x, beta): 
+        x_batch, mask_batch = x['input'], x['mask']
+        kl_loss = None
+        # encoder
+        h = self.glem(x_batch) # bs, c, n, n 
+        z = F.softmax(h, dim= -2) # softmax along row dimension. (col-sum = 1.)
+        # obtain kl_loss 
+        kl_loss = kl_categorical_uniform(z, self.num_ts)
+        if self.training: 
+            A = gumbel_softmax(h, self.tau, hard= False, dim=-2)
+        else: 
+            A = gumbel_softmax(h, self.tau, hard= True, dim=-2)
+        # decoder 
+        x_batch = self.projection(x_batch) 
+        bs, c, t, n = x_batch.shape 
+
+        outs_label = torch.zeros((bs, c * (self.num_blocks+2), t, n)).to(self.device) # to collect outputs from modules
+        out = x_batch.clone().detach()
+        outs_label[:, ::(self.num_blocks+2), ...] = out
+        for i in range(self.num_blocks): 
+            tc_out, out = getattr(self, f'hetero_block{i}')(out, A, beta)
+            # x_batch += tc_out 
+            outs_label[:, (i+1)::(self.num_blocks+2), ...] = tc_out
+            # x_batch = torch.cat([x_batch, tc_out], dim= 1)
+        # x_batch += out # bs, c, n, l 
+        outs_label[:, (self.num_blocks+1)::(self.num_blocks+2), ...] = out
+        # x_batch = torch.cat([x_batch, out], dim=1)
+        
+        # generate eNB-graph
+        # eNB_rep: (output_label) bs, c, 1, n --> bs, c, 1, 1 --> bs, 1, 1, c --> bs, 1, c, c
+        # kl_loss_eNB = None      
+
+        # fc_out 
+        outs_label = self.fc_decode(outs_label) # bs, c, t, n
+        eNB_rep = self.eNB_emb(outs_label)
+        # (1, n) kernel covolution --> bs, c, t, 1  
+        eNB_rep = torch.transpose(eNB_rep.squeeze(), -1, -2).contiguous() # bs, c, t
+        eNB_rep = eNB_rep[:, None, ...]
+        # resahpe --> bs ,1, t, c  
+
+        h_enb = self.eNB_adj(eNB_rep) # bs, 1, t, c -->  bs, 1, c, c
+        z_enb = F.softmax(h_enb, dim= -1) 
+        kl_loss_eNB = kl_categorical_uniform(z_enb, self.num_ts)
+        if self.training: 
+            A_eNB = gumbel_softmax(h_enb, self.tau, hard= False, dim=-1).squeeze() # bs x c x c
+        else: 
+            A_eNB = gumbel_softmax(h_enb, self.tau, hard= True, dim=-1).squeeze() # bs x c x c  
+        
+        outs_label = self.fc_out(outs_label).permute(0, 2, 1, 3).squeeze() # bs, c, 1, n --> bs, 1, c, n
+        outs_label = torch.matmul(A_eNB, outs_label) # (bs, c, c), (bs, c, n) --> (bs, c, n)
+        outs_label = outs_label[:, :, None, :] 
+        
+        outs_mask = torch.sigmoid(self.mask_block(mask_batch)) # masks
+
+        return {
+            'preds': outs_label * outs_mask, 
+            'outs_label': outs_label, 
+            'outs_mask': outs_mask, 
+            'kl_loss': kl_loss+kl_loss_eNB, 
+            'adj_mat': A, 
+            'adj_mat_eNB': A_eNB
         }
