@@ -312,7 +312,7 @@ def test_regr(args,
             adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
             plt.figure(figsize =(15,15))
             # plt.xkcd()
-            G = nx.from_pandas_adjacency(adj_mat)
+            G = nx.from_pandas_adjacency(adj_mat, create_using=nx.DiGraph)
             G = nx.DiGraph(G)
             pos = nx.circular_layout(G)
             nx.draw_networkx(G, pos=pos, **options)
