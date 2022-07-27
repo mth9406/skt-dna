@@ -33,6 +33,8 @@ parser.add_argument('--lag', type= int, default= 1,
                 help= 'time-lag (default: 1)')
 parser.add_argument('--cache_file', type= str, default= './data/cache.pickle', 
                 help= 'a cache file to min-max scale the data')
+parser.add_argument('--graph_time_range', type= int, default= 36, 
+                help= 'time-range to save a graph')
 
 # Training options
 parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
