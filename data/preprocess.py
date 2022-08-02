@@ -1,15 +1,12 @@
 import argparse 
 import pandas as pd 
 import numpy as np 
-import torch 
 
 import os
 from time import time
 from tqdm import tqdm 
 from functools import reduce 
 
-import pickle
-import json
 import csv 
 
 parser = argparse.ArgumentParser()
@@ -18,12 +15,9 @@ parser.add_argument('--data_path', type= str, default= './skt',
                 help= 'a path to the data (default= \'./\'')
 parser.add_argument('--split_data_path', type= str, default= './skt_split')
 parser.add_argument('--split_data_adj_path', type= str, default= './skt_split_adj')
-# parser.add_argument('--time_lag', type= int, default= 2)
 
 parser.add_argument('--verbose', action= 'store_true', 
                 help= 'to print the preprocess-logs')
-# parser.add_argument('--save_as_files', action= 'store_true', 
-#                 help= 'to save every window in a split file')
 
 args = parser.parse_args() 
 
@@ -157,30 +151,3 @@ def main(args):
 
 if __name__ == '__main__':
     main(args)
-
-# Depreciated codes...
-
-    # convert the original data into the time series-data
-    # print(f'converting the split data into a set of windows')
-    # file_list = os.listdir('../skt_split')
-    # file_list = [os.path.join(args.split_data_path, file_name) for file_name in file_list]
-
-    # num = 0
-    # ws = {}
-    # for f in tqdm(file_list, desc= 'outer', position= 0, total= len(file_list)): 
-    #     df = pd.read_csv(f)
-    #     cols = list(df.columns.drop('RRC_FAIL_RATE'))
-    #     x, y = df[cols], df['RRC_FAIL_RATE']
-    #     n = x.shape[0]
-    #     for i in tqdm(range(n-args.time_lag), desc='inner', position= 1, leave= False, total= n-args.time_lag): 
-    #         xt = x.iloc[i:i+args.time_lag+1].values 
-    #         yt = y.iloc[i:i+args.time_lag+1].values 
-    #         mt = torch.FloatTensor(np.isnan(xt) * 1.) # mask 
-    #         w = {'xt': torch.FloatTensor(xt), 'mt': mt, 'yt': torch.FloatTensor(yt)} # window
-    #         ws['window' + str(num)] = w
-    #         num += 1
-            
-    # # save the windows
-    # with open(os.path.join(args.time_series_path, f'window{num}.json'), 'w') as json_file: 
-    #     json.dump(ws, json_file)
-    # print(f'converting done!')

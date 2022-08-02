@@ -12,10 +12,7 @@ parser.add_argument('--data_path', type= str, default= './skt',
                 help= 'a path to the data (default= \'./skt\'')
 parser.add_argument('--enb_data_path', type= str, default= './enb',
                 help= 'a path to save the splid data')
-
-parser.add_argument('--verbose', action= 'store_true', 
-                help= 'to print the preprocess-logs')
-
+                
 args = parser.parse_args() 
 
 if not os.path.exist(args.enb_data_path):

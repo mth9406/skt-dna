@@ -12,9 +12,10 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.utils.data import DataLoader
 
-from torchUtils import * 
-from models import *
-from dataloader import * 
+from utils.utils import * 
+from utils.torchUtils import *
+from layers.models import *
+from utils.dataloader import * 
 
 parser = argparse.ArgumentParser()
 # Data path
@@ -73,7 +74,7 @@ parser.add_argument('--test', action='store_true', help='test')
 parser.add_argument('--model_file', type= str, default= 'latest_checkpoint.pth.tar'
                     ,help= 'model file', required= False)
 parser.add_argument('--model_type', type= str, default= 'proto', 
-                    help= 'one of: \'proto\', \'heteroNRI\'... ')
+                    help= 'one of: \'mtgnn\', \'heteroNRI\'... ')
 
 parser.add_argument('--num_folds', type= int, default= 1, 
                     help = 'the number of folds')
@@ -120,8 +121,8 @@ def main(args):
     print("Loading data done!")
 
     # model
-    if args.model_type == 'proto':
-        model = HeteroMTGNN(
+    if args.model_type == 'mtgnn':
+        model = MTGNN(
             num_heteros= args.num_heteros,
             num_ts= args.num_ts,  
             time_lags= args.lag, 
@@ -132,7 +133,6 @@ def main(args):
             alpha= args.alpha,
             top_k= args.top_k
         ).to(device)
-        print('The model is on GPU') if next(model.parameters()).is_cuda else print('The model is on CPU')
     elif args.model_type == 'heteroNRI':
         model = HeteroNRI(
             num_heteros= args.num_heteros,
@@ -156,6 +156,7 @@ def main(args):
     else:
         print("The model is yet to be implemented.")
         sys.exit()
+    print('The model is on GPU') if next(model.parameters()).is_cuda else print('The model is on CPU')
     
     # setting training args...
     criterion = nn.MSELoss()

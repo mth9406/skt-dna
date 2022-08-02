@@ -1,11 +1,11 @@
 import torch 
 from torch import nn
 
-from layers import * 
-from graphLearningLayers import * 
+from layers.layers import * 
+from layers.graphLearningLayers import * 
 
-class HeteroMTGNN(nn.Module): 
-    r"""Heterogeneous Multivariate Time Series Forecasting with Graph Neural Networks 
+class MTGNN(nn.Module): 
+    r"""Multivariate Time Series Forecasting with Graph Neural Networks 
     
     This work is heavily based on the work by 
     
@@ -68,14 +68,14 @@ class HeteroMTGNN(nn.Module):
         self.fc_decode = nn.Sequential(
             nn.Conv2d(num_heteros*(num_blocks+2), num_heteros, kernel_size=1,  groups= num_heteros, padding= 0), 
             nn.BatchNorm2d(num_heteros),
-            nn.GELU(), 
+            nn.LeakyReLU(negative_slope= 0.5), 
             ResidualAdd(nn.Sequential(
             nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, groups= num_heteros, padding= 0), 
             nn.BatchNorm2d(num_heteros), 
-            nn.GELU(),
-            nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, padding= 0)
+            nn.LeakyReLU(negative_slope= 0.5),
+            nn.Conv2d(num_heteros, num_heteros, groups= num_heteros, kernel_size= 1, padding= 0)
             )), 
-            nn.GELU()
+            nn.LeakyReLU(negative_slope= 0.5)
         )
         self.fc_out = nn.Sequential(
             nn.Conv2d(num_heteros, num_heteros, kernel_size= (time_lags,1), padding= 0), 
@@ -211,14 +211,14 @@ class HeteroNRI(nn.Module):
         self.fc_decode = nn.Sequential(
             nn.Conv2d(num_heteros*(num_blocks+2), num_heteros, kernel_size=1,  groups= num_heteros, padding= 0), 
             nn.BatchNorm2d(num_heteros),
-            nn.GELU(), 
+            nn.LeakyReLU(negative_slope= 0.5), 
             ResidualAdd(nn.Sequential(
             nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, groups= num_heteros, padding= 0), 
             nn.BatchNorm2d(num_heteros), 
-            nn.GELU(),
+            nn.LeakyReLU(negative_slope= 0.5),
             nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, padding= 0)
             )), 
-            nn.GELU()
+            nn.LeakyReLU(negative_slope= 0.5)
         )
         self.fc_out = nn.Sequential(
             nn.Conv2d(num_heteros, num_heteros, kernel_size= (time_lags,1), groups= num_heteros, padding= 0), 

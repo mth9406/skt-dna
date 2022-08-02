@@ -44,11 +44,14 @@ class SubplotAnimation(animation.TimedAnimation):
                         'alpha' : 1,
                         'font_size' : 8
                     }
-        fig = plt.figure(figsize= (5,5+5*num_ts))
-        gs1 = GridSpec(5+5*num_ts, 5)
-        fig.add_subplot(gs1[:5, :]) # a grid for a graph 
-        for i in range(5,5+5*num_ts,5):
-            fig.add_subplot(gs1[i:i+5, :]) # a grid for a time series
+        fig = plt.figure(figsize= (10+5*num_ts,10))
+        num_cols = num_ts // 2 if num_ts % 2==0 else num_ts//2 + 1
+        gs1 = GridSpec(10,10+5*num_cols)
+        fig.add_subplot(gs1[:, :10]) # a grid for a graph 
+        
+        for i in range(10, 10+5*num_cols, 5): # 5
+            fig.add_subplot(gs1[:5,i:i+5]) # a grid for a time series
+            fig.add_subplot(gs1[5:,i:i+5])
         # graph 
         fig.axes[0].axis('off')
         fig.axes[0].set_title(f'relation graph enb{enb_num}')

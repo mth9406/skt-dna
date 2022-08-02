@@ -8,14 +8,13 @@ import csv
 from tqdm import tqdm 
 import networkx as nx
 
-# from sklearn.metrics import confusion_matrix, accuracy_score, recall_score, precision_score, f1_score
-# from sklearn.metrics import ConfusionMatrixDisplay
 from sklearn.metrics import r2_score
 from sklearn.metrics import mean_absolute_error
 from sklearn.metrics import mean_squared_error
 from matplotlib import pyplot as plt
 
-from utils import *
+from utils.torchUtils import *
+from utils.utils import *
 
 class EarlyStopping:
     r"""
@@ -307,7 +306,7 @@ def test_regr(args,
         fig_file = os.path.join(fig_path, f'figure_{enb_id}.png')
         fig.savefig(fig_file)
 
-        if args.model_type == 'proto': 
+        if args.model_type == 'mtgnn': 
             adj_mat = model.gen_adj[i](idx).data.cpu().numpy() 
             adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
             plt.figure(figsize =(15,15))

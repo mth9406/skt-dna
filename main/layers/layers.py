@@ -2,8 +2,6 @@ import torch
 from torch import nn 
 from torch.nn import functional as F
 
-from utils import *
-
 def make_input_n_mask_pairs(x, device): 
     r"""A fucntion to make pairs of input-mask
 
@@ -165,7 +163,27 @@ class InformationPropagtionLayer(nn.Module):
         h = torch.matmul(x, A_inter) # bs, c, t, n 
         # h = self.beta * x + (1-self.beta) * h
         return beta * h_in + (1-beta) * h
-        
+
+# graph convolution layer 
+class AttentionInformationPropagtionLayer(nn.Module): 
+    r"""Attention Information Propagtion Layer
+    todo....
+    """
+    def __init__(self): 
+        super().__init__() 
+
+    def forward(self, x, h_in, A_inter, beta= 0.5): 
+        r"""Feed forward
+        x : FloatTensor
+            input time series 
+            bs x C x T x N 
+        A_inter : C x N x N 
+            adjacency matrix (inter time series)
+        """
+        h = torch.matmul(x, A_inter) # bs, c, t, n 
+        # h = self.beta * x + (1-self.beta) * h
+        return beta * h_in + (1-beta) * h
+
 # graph convolution module 
 class GraphConvolutionModule(nn.Module): 
     r"""Graph convolution module
@@ -223,7 +241,9 @@ class GraphConvolutionModule(nn.Module):
                     A_tilde = D_tilde_inv @ (A + eye)
             return A_tilde 
         else: 
-            return A
+            # shape of A is [bs, c, n, n]
+            col_sum = A.sum(dim= -2, keepdim= True)
+            return A/col_sum
 
 class HeteroBlock(nn.Module):
     r"""Hetero block 
@@ -272,4 +292,4 @@ class HeteroBlock(nn.Module):
         out_tc = self.tc_module(x) 
         x = self.gc_module(out_tc, A, beta= beta)
         # x += self.gc_module_t(out_tc, torch.transpose(A, -1, -2), beta= beta)
-        return out_tc, F.gelu(x+res)
+        return out_tc, F.leaky_relu(x+res,negative_slope=0.5)

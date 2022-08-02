@@ -3,7 +3,8 @@ from torch import nn
 from torch.nn import functional as F
 import numpy as np 
 
-from layers import *
+from layers.graphLearningLayers import *
+from layers.layers import * 
 
 # graph learning layer from connecting the dots.
 class AdjConstructor(nn.Module): 
