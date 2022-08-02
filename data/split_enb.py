@@ -37,16 +37,16 @@ def main(args):
     # the set of time-stamps
     ts_set = np.sort(list(data['Time_Stamp'].unique()))
     ts_set = ts_set.astype('datetime64')
-    ts = pd.Series(ts_set, name= 'Time_Stamp')
+    ts_series = pd.Series(ts_set, name= 'Time_Stamp')
     
     ts = time()
     for enb_id in tqdm(enb_set, total= len(enb_set)): 
         idx = data['ENB_ID'] == enb_id
         enb = data.loc[idx, :]
-        enb = pd.merge_ordered(ts, enb, on= 'Time_Stamp', how= 'left')
+        enb = pd.merge_ordered(ts_series, enb, on= 'Time_Stamp', how= 'left')
         enb = enb.groupby('Time_Stamp').mean()
         enb = enb.drop(['ENB_ID'], axis =1)
-        assert len(enb) == len(ts), f'something wrong is goining on in the eNB {enb_id}'
+        assert len(enb) == len(ts_series), f'something wrong is goining on in the eNB {enb_id}'
 
         # save the enb file 
         f = os.path.join(args.enb_data_path, f'enb{enb_id}.csv')
