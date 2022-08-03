@@ -9,13 +9,13 @@ from tqdm import tqdm
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--data_path', type= str, default= './skt', 
-                help= 'a path to the data (default= \'./skt\'')
+                help= 'a path to the data (default= \'./skt\')')
 parser.add_argument('--enb_data_path', type= str, default= './enb',
                 help= 'a path to save the splid data')
                 
 args = parser.parse_args() 
 
-if not os.path.exist(args.enb_data_path):
+if not os.path.exists(args.enb_data_path):
     print('making a path to save enb data...')
     os.makedirs(args.enb_data_path, exist_ok= True)
 else: 
@@ -23,7 +23,7 @@ else:
 
 def main(args): 
     print('loading raw-data...')
-    raw = pd.read_csv('./data/ChristmasWeek_KPI_Gangnam.csv')
+    raw = pd.read_csv(os.path.join(args.data_path, 'ChristmasWeek_KPI_Gangnam.csv'))
     data = raw.drop(['Unnamed: 0','ADONG_CD', 'CELL_NO', 'CALL_RELEASE_CNT'], axis= 1)
     # change the data type of time-stamp
     data['Time_Stamp'] = data['Time_Stamp'].astype('datetime64')
@@ -43,6 +43,7 @@ def main(args):
     for enb_id in tqdm(enb_set, total= len(enb_set)): 
         idx = data['ENB_ID'] == enb_id
         enb = data.loc[idx, :]
+        enb = enb.interpolate() # interpolate the data before merging.
         enb = pd.merge_ordered(ts_series, enb, on= 'Time_Stamp', how= 'left')
         enb = enb.groupby('Time_Stamp').mean()
         enb = enb.drop(['ENB_ID'], axis =1)
