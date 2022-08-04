@@ -95,8 +95,11 @@ def train(args,
             with torch.set_grad_enabled(True):
                 out = model(x, args.beta)
                 mse_loss = criterion(out['outs_label'], x['label'])
-                bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
-                loss = mse_loss + bce_loss
+                if out['outs_mask'] is not None: 
+                    bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
+                    loss = mse_loss + bce_loss
+                else: 
+                    loss = mse_loss
                 if out['kl_loss'] is not None: 
                     loss += args.kl_loss_penalty * out['kl_loss']
                 # if out['regularization_loss'] is not None: 
@@ -112,7 +115,10 @@ def train(args,
             # store the d_tr_loss
             tr_loss += loss.detach().cpu().item()
             tr_mse_loss += mse_loss.detach().cpu().item() 
-            tr_bce_loss += bce_loss.detach().cpu().item() 
+            if out['outs_mask'] is not None: 
+                tr_bce_loss += bce_loss.detach().cpu().item() 
+            else: 
+                tr_bce_loss = float('nan')
 
             if (batch_idx+1) % args.print_log_option == 0:
                 print(f'Epoch [{epoch+1}/{args.epoch}] Batch [{batch_idx+1}/{num_batches}]: \
@@ -128,13 +134,19 @@ def train(args,
             with torch.no_grad():
                 out = model(x, args.beta)
                 mse_loss = criterion(out['outs_label'], x['label'])
-                bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
-                loss = mse_loss + bce_loss
+                if out['outs_mask'] is not None: 
+                    bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
+                    loss = mse_loss + bce_loss
+                else: 
+                    loss = mse_loss 
                 if out['kl_loss'] is not None: 
                     loss += args.kl_loss_penalty * out['kl_loss']
             valid_loss += loss.detach().cpu().item()
             valid_mse_loss += mse_loss.detach().cpu().item() 
-            valid_bce_loss += bce_loss.detach().cpu().item()         
+            if out['outs_mask'] is not None: 
+                valid_bce_loss += bce_loss.detach().cpu().item()    
+            else: 
+                valid_bce_loss = float('nan')     
         # save current loss values
         tr_loss, valid_loss = tr_loss/len(train_loader), valid_loss/len(valid_loader)
         tr_mse_loss, tr_bce_loss = tr_mse_loss/len(train_loader), tr_bce_loss/len(train_loader)
@@ -197,8 +209,11 @@ def test_regr(args,
         with torch.no_grad():
             out = model(x, args.beta)
             mse_loss = criterion(out['outs_label'], x['label'])
-            bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
-            loss = mse_loss + bce_loss 
+            if out['outs_mask'] is not None: 
+                bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
+                loss = mse_loss + bce_loss
+            else: 
+                loss = mse_loss 
             if out['kl_loss'] is not None: 
                 loss += args.kl_loss_penalty * out['kl_loss']
             preds_loss = criterion(out['preds'], x['label'])
@@ -209,8 +224,11 @@ def test_regr(args,
                 graphs.append(out['adj_mat'].detach().cpu()) # bs, c, n, n
 
         te_tot_loss += loss.detach().cpu().numpy() 
-        te_mse_loss += mse_loss.detach().cpu().numpy() 
-        te_bce_loss += bce_loss.detach().cpu().numpy()
+        te_mse_loss += mse_loss.detach().cpu().numpy()
+        if out['outs_label'] is not None:  
+            te_bce_loss += bce_loss.detach().cpu().numpy()
+        else: 
+            te_bce_loss = float('nan')
         te_preds_loss += preds_loss.detach().cpu().numpy()
 
         te_r2 += r2_score(out['preds'].detach().cpu().numpy().flatten(), x['label'].detach().cpu().numpy().flatten())
