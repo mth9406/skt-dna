@@ -82,10 +82,10 @@ class MTGNN(nn.Module):
             nn.Tanh()
         )
             
-        self.mask_block = nn.Sequential(
-            ResidualAdd(TemporalConvolutionModule(num_heteros, num_heteros, num_heteros)),
-            nn.Conv2d(num_heteros, num_heteros, kernel_size=(time_lags,1), groups= num_heteros)
-        )
+        # self.mask_block = nn.Sequential(
+        #     ResidualAdd(TemporalConvolutionModule(num_heteros, num_heteros, num_heteros)),
+        #     nn.Conv2d(num_heteros, num_heteros, kernel_size=(time_lags,1), groups= num_heteros)
+        # )
 
         self.num_heteros = num_heteros
         self.num_ts = num_ts 
@@ -122,12 +122,12 @@ class MTGNN(nn.Module):
         outs_label = self.fc_decode(outs_label)
         outs_label = self.fc_out(outs_label)
         
-        outs_mask = torch.sigmoid(self.mask_block(mask_batch)) # masks
+        # outs_mask = torch.sigmoid(self.mask_block(mask_batch)) # masks
 
         return {
-            'preds': outs_label * outs_mask, 
+            'preds': outs_label, 
             'outs_label': outs_label, 
-            'outs_mask': outs_mask,
+            'outs_mask': None,
             'kl_loss': None, 
             'adj_mat': None
         }
