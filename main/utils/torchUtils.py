@@ -225,7 +225,7 @@ def test_regr(args,
 
         te_tot_loss += loss.detach().cpu().numpy() 
         te_mse_loss += mse_loss.detach().cpu().numpy()
-        if out['outs_label'] is not None:  
+        if out['outs_mask'] is not None:  
             te_bce_loss += bce_loss.detach().cpu().numpy()
         else: 
             te_bce_loss = float('nan')
