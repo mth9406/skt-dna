@@ -210,7 +210,7 @@ class GraphConvolutionModule(nn.Module):
             = in_features, out_features, k
     
     def forward(self, x, A, beta= 0.5):
-        A_tilde = self.norm_adj(A)
+        A_tilde = A # assumes the matrix 'A' is normalized...
         A_tilde_after = A_tilde
         # x = self.conv_inter(x)
         hiddens = [x]
@@ -225,25 +225,6 @@ class GraphConvolutionModule(nn.Module):
             info_select = getattr(self, f'info_select{i}')
             out += info_select(hiddens[i])
         return out 
-
-    def norm_adj(self, A): 
-        r"""Obtains normalized version of an adjacency matrix
-        """
-        if len(A.shape) == 3 or len(A.shape) == 2:
-            with torch.no_grad():
-                if len(A.shape) == 3: 
-                    eyes = torch.stack([torch.eye(A.shape[1]) for _ in range(A.shape[0])]).to(device= A.device)
-                    D_tilde_inv = torch.diag_embed(1/(1. + torch.sum(A, dim=1))) # C x N x N 
-                    A_tilde = D_tilde_inv @ (A + eyes)
-                else: 
-                    eye = torch.eye(A.shape[1]).to(A.device)
-                    D_tilde_inv = torch.diag(1/(1.+torch.sum(A, dim=1)))
-                    A_tilde = D_tilde_inv @ (A + eye)
-            return A_tilde 
-        else: 
-            # shape of A is [bs, c, n, n]
-            col_sum = A.sum(dim= -2, keepdim= True)
-            return A/col_sum
 
 class HeteroBlock(nn.Module):
     r"""Hetero block 
@@ -288,8 +269,28 @@ class HeteroBlock(nn.Module):
         A : torch-tensor           
             Adjacency matrix        
         """
+        A_tilde = self.norm_adj(A)
         res = x 
         out_tc = self.tc_module(x) 
-        x = self.gc_module(out_tc, A, beta= beta)
+        x = self.gc_module(out_tc, A_tilde, beta= beta)
         # x += self.gc_module_t(out_tc, torch.transpose(A, -1, -2), beta= beta)
         return out_tc, F.leaky_relu(x+res,negative_slope=0.5)
+
+    def norm_adj(self, A): 
+        r"""Obtains normalized version of an adjacency matrix
+        """
+        if len(A.shape) == 3 or len(A.shape) == 2:
+            with torch.no_grad():
+                if len(A.shape) == 3: 
+                    eyes = torch.stack([torch.eye(A.shape[1]) for _ in range(A.shape[0])]).to(device= A.device)
+                    D_tilde_inv = torch.diag_embed(1/(1. + torch.sum(A, dim=1))) # C x N x N 
+                    A_tilde = D_tilde_inv @ (A + eyes)
+                else: 
+                    eye = torch.eye(A.shape[1]).to(A.device)
+                    D_tilde_inv = torch.diag(1/(1.+torch.sum(A, dim=1)))
+                    A_tilde = D_tilde_inv @ (A + eye)
+            return A_tilde 
+        else: 
+            # shape of A is [bs, c, n, n]
+            col_sum = A.sum(dim= -2, keepdim= True)
+            return A/col_sum
