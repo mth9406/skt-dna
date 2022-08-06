@@ -254,104 +254,105 @@ def test_regr(args,
     print(f"mse: {te_mse:.2f}")
     print()    
 
-    # concatenate predictions
-    print('saving the predictions...')
-    preds = torch.concat(preds, dim=0) # num_obs, num_cells, num_time_series, 1 
-    preds = torch.permute(torch.squeeze(preds), (1, 0, 2)) # num_cells, num_obs, num_time_series 
-    preds = preds.numpy()
-    if args.cache is not None: 
-        # preds = inv_min_max_scaler(preds, args.cache, args.columns)
-        preds = inv_min_max_scaler_ver2(preds, args.cache, args.columns)
+    if args.num_folds == 1:
+        # concatenate predictions
+        print('saving the predictions...')
+        preds = torch.concat(preds, dim=0) # num_obs, num_cells, num_time_series, 1 
+        preds = torch.permute(torch.squeeze(preds), (1, 0, 2)) # num_cells, num_obs, num_time_series 
+        preds = preds.numpy()
+        if args.cache is not None: 
+            # preds = inv_min_max_scaler(preds, args.cache, args.columns)
+            preds = inv_min_max_scaler_ver2(preds, args.cache, args.columns)
 
-    labels = torch.concat(labels, dim=0) # num_obs, num_cells, num_time_series, 1
-    labels = torch.permute(torch.squeeze(labels), (1, 0, 2)) # num_cells, num_obs, num_time_series
-    labels = labels.numpy()
-    if args.cache is not None: 
-        # labels = inv_min_max_scaler(labels, args.cache, args.columns)
-        labels = inv_min_max_scaler_ver2(labels, args.cache, args.columns)
-    
-    if len(graphs) > 0: 
-        graphs = torch.concat(graphs, dim=0) # num_obs, num_cells, num_time_series, num_time_series
-        graphs = torch.permute(graphs, (1, 0, 2, 3)) # num_cells, num_obs, num_time_series, num_time_series
-        graphs = graphs.numpy() 
-    
-    num_cells = labels.shape[0]
-
-    # make a path to save a figures 
-    fig_path = os.path.join(args.model_path, 'test/figures')
-    if not os.path.exists(fig_path):
-        print("Making a path to save figures...")
-        print(f"{fig_path}")
-        os.makedirs(fig_path, exist_ok= True)
-    else:
-        print("The path to save figures already exists, skip making the path...")
-    
-    # make a path to save a graphs 
-    graph_path = os.path.join(args.model_path, 'test/graphs')
-    if not os.path.exists(graph_path):
-        print("Making a path to save graphs...")
-        print(f"{graph_path}")
-        os.makedirs(graph_path, exist_ok= True)
-    else:
-        print("The path to save graphs already exists, skip making the path...")
-
-    options = {
-        'node_color': 'skyblue',
-        'node_size': 3000,
-        'width': 0.5 ,
-        'arrowstyle': '-|>',
-        'arrowsize': 20,
-        'alpha' : 1,
-        'font_size' : 15
-    }
-    idx = torch.LongTensor(np.arange(len(args.columns))).to(device)
-    for i in tqdm(range(num_cells), total= num_cells):
-        enb_id = args.decoder.get(i)
-        write_csv(args, 'test/predictions', f'predictions_{enb_id}.csv', preds[i, ...], args.columns)
-        write_csv(args, 'test/labels', f'labels_{enb_id}.csv', labels[i, ...], args.columns)   
+        labels = torch.concat(labels, dim=0) # num_obs, num_cells, num_time_series, 1
+        labels = torch.permute(torch.squeeze(labels), (1, 0, 2)) # num_cells, num_obs, num_time_series
+        labels = labels.numpy()
+        if args.cache is not None: 
+            # labels = inv_min_max_scaler(labels, args.cache, args.columns)
+            labels = inv_min_max_scaler_ver2(labels, args.cache, args.columns)
         
-        fig, axes = plt.subplots(len(args.columns), 1, figsize= (10,3*len(args.columns)))
+        if len(graphs) > 0: 
+            graphs = torch.concat(graphs, dim=0) # num_obs, num_cells, num_time_series, num_time_series
+            graphs = torch.permute(graphs, (1, 0, 2, 3)) # num_cells, num_obs, num_time_series, num_time_series
+            graphs = graphs.numpy() 
+        
+        num_cells = labels.shape[0]
 
-        for j in range(len(args.columns)):
-            col_name = args.columns[j]
-            fig.axes[j].set_title(f'time-seris plot: {col_name}')
-            fig.axes[j].plot(preds[i,:,j], label= 'prediction')
-            fig.axes[j].plot(labels[i,:,j], label= 'label')
-            fig.axes[j].legend()
-
-        fig.suptitle(f"Prediction and True label plot of {enb_id}", fontsize=20, position= (0.5, 1.0+0.05))
-        fig.tight_layout()
-        fig_file = os.path.join(fig_path, f'figure_{enb_id}.png')
-        fig.savefig(fig_file)
-
-        if args.model_type == 'mtgnn': 
-            adj_mat = model.gen_adj[i](idx).data.cpu().numpy() 
-            adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
-            plt.figure(figsize =(15,15))
-            # plt.xkcd()
-            G = nx.from_pandas_adjacency(adj_mat, create_using=nx.DiGraph)
-            G = nx.DiGraph(G)
-            pos = nx.circular_layout(G)
-            nx.draw_networkx(G, pos=pos, **options)
-            plt.savefig(os.path.join(graph_path, f"graph_{enb_id}.png"), format="PNG")
+        # make a path to save a figures 
+        fig_path = os.path.join(args.model_path, 'test/figures')
+        if not os.path.exists(fig_path):
+            print("Making a path to save figures...")
+            print(f"{fig_path}")
+            os.makedirs(fig_path, exist_ok= True)
         else:
-            graph_path = os.path.join(args.model_path, f'test/graphs/{enb_id}')
+            print("The path to save figures already exists, skip making the path...")
+        
+        # make a path to save a graphs 
+        graph_path = os.path.join(args.model_path, 'test/graphs')
+        if not os.path.exists(graph_path):
+            print("Making a path to save graphs...")
+            print(f"{graph_path}")
             os.makedirs(graph_path, exist_ok= True)
-            plt.figure(figsize =(15,15))
-            for j in range(args.graph_time_range):
-                # num_obs, num_time_series, num_time_series
-                graph_file = os.path.join(graph_path, f'{enb_id}_graph_{j}.png') 
-                adj_mat = np.transpose(graphs[i, j, ...]) # num_time_series, num_time_series 
+        else:
+            print("The path to save graphs already exists, skip making the path...")
+
+        options = {
+            'node_color': 'skyblue',
+            'node_size': 3000,
+            'width': 0.5 ,
+            'arrowstyle': '-|>',
+            'arrowsize': 20,
+            'alpha' : 1,
+            'font_size' : 15
+        }
+        idx = torch.LongTensor(np.arange(len(args.columns))).to(device)
+        for i in tqdm(range(num_cells), total= num_cells):
+            enb_id = args.decoder.get(i)
+            write_csv(args, 'test/predictions', f'predictions_{enb_id}.csv', preds[i, ...], args.columns)
+            write_csv(args, 'test/labels', f'labels_{enb_id}.csv', labels[i, ...], args.columns)   
+            
+            fig, axes = plt.subplots(len(args.columns), 1, figsize= (10,3*len(args.columns)))
+
+            for j in range(len(args.columns)):
+                col_name = args.columns[j]
+                fig.axes[j].set_title(f'time-seris plot: {col_name}')
+                fig.axes[j].plot(preds[i,:,j], label= 'prediction')
+                fig.axes[j].plot(labels[i,:,j], label= 'label')
+                fig.axes[j].legend()
+
+            fig.suptitle(f"Prediction and True label plot of {enb_id}", fontsize=20, position= (0.5, 1.0+0.05))
+            fig.tight_layout()
+            fig_file = os.path.join(fig_path, f'figure_{enb_id}.png')
+            fig.savefig(fig_file)
+
+            if args.model_type == 'mtgnn': 
+                adj_mat = model.gen_adj[i](idx).data.cpu().numpy() 
                 adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
-                # save the adj-matrix in csv format 
-                adj_mat.to_csv(os.path.join(graph_path, f'{enb_id}_graph_{j}.csv'))
-                G = nx.from_pandas_adjacency(adj_mat)
+                plt.figure(figsize =(15,15))
+                # plt.xkcd()
+                G = nx.from_pandas_adjacency(adj_mat, create_using=nx.DiGraph)
                 G = nx.DiGraph(G)
                 pos = nx.circular_layout(G)
                 nx.draw_networkx(G, pos=pos, **options)
-                plt.savefig(graph_file, format="PNG")
-            # plt.close('all')
-        plt.close('all')
+                plt.savefig(os.path.join(graph_path, f"graph_{enb_id}.png"), format="PNG")
+            else:
+                graph_path = os.path.join(args.model_path, f'test/graphs/{enb_id}')
+                os.makedirs(graph_path, exist_ok= True)
+                plt.figure(figsize =(15,15))
+                for j in range(args.graph_time_range):
+                    # num_obs, num_time_series, num_time_series
+                    graph_file = os.path.join(graph_path, f'{enb_id}_graph_{j}.png') 
+                    adj_mat = np.transpose(graphs[i, j, ...]) # num_time_series, num_time_series 
+                    adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
+                    # save the adj-matrix in csv format 
+                    adj_mat.to_csv(os.path.join(graph_path, f'{enb_id}_graph_{j}.csv'))
+                    G = nx.from_pandas_adjacency(adj_mat)
+                    G = nx.DiGraph(G)
+                    pos = nx.circular_layout(G)
+                    nx.draw_networkx(G, pos=pos, **options)
+                    plt.savefig(graph_file, format="PNG")
+                # plt.close('all')
+            plt.close('all')
 
     perf = {
         'r2': te_r2,

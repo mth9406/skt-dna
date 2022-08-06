@@ -66,14 +66,12 @@ parser.add_argument('--beta', type= float , default= 0.5,
 # only for the heteroNRI
 parser.add_argument('--tau', type= float, default= 1., 
                 help= 'smoothing parameter used in the Gumbel-Softmax, only used in the model: heteroNRI')
-parser.add_argument('--hard', action= 'store_true', 
-                help= 'apply hard coding the the graph (outcome of Gumbel-Softmax), only used in the model: heteroNRI')
 
 # To test
 parser.add_argument('--test', action='store_true', help='test')
 parser.add_argument('--model_file', type= str, default= 'latest_checkpoint.pth.tar'
                     ,help= 'model file', required= False)
-parser.add_argument('--model_type', type= str, default= 'proto', 
+parser.add_argument('--model_type', type= str, default= 'heteroNRI', 
                     help= 'one of: \'mtgnn\', \'heteroNRI\'... ')
 
 parser.add_argument('--num_folds', type= int, default= 1, 
