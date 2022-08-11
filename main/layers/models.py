@@ -3,6 +3,7 @@ from torch import nn
 
 from layers.layers import * 
 from layers.graphLearningLayers import * 
+from layers.nriLayers import *
 
 class MTGNN(nn.Module): 
     r"""Multivariate Time Series Forecasting with Graph Neural Networks 
@@ -153,6 +154,80 @@ def kl_categorical_uniform(preds, num_ts, eps=1e-16):
     #     kl_div += const
     return -kl_div.sum() / (num_ts * preds.size(0))    
 
+class NRI(nn.Module): 
+    r"""
+    
+    This work is based on the work by 
+    
+    \"""
+    Kipf, T., Fetaya, E., Wang, K. C., Welling, M., & Zemel, R. (2018, July). 
+    Neural relational inference for interacting systems. 
+    In International Conference on Machine Learning (pp. 2688-2697). PMLR.
+    \"""
+
+    # Arguments 
+    ___________
+    num_heteros : int 
+        the number of heterogeneous groups (stack along the channel dimension)
+    num_ts : int
+        the number of time-series 
+        should be 10 for the skt-data
+    time_lags : int 
+        the size of 'time_lags'
+    tau: float 
+        softmax temperature - a parameter that controls the smoothness of the samples       
+    kwargs : key word arguments
+        * groups
+        * drop_p 
+        * ...
+    """
+    def __init__(self, 
+                 num_heteros: int,
+                 num_time_series: int, 
+                 time_lags: int, 
+                 tau: float, 
+                 device,
+                 **kwargs
+                ):
+        super().__init__()
+
+        #edge weights have dim 2
+        self.encoder = MLPEncoder(time_lags * num_time_series, 256, 1)
+        self.decoder = MLPDecoder(n_in_node=num_time_series,
+                                edge_types=1,
+                                msg_hid=256,
+                                msg_out=256,
+                                n_hid=256)
+        self.rel_rec, self.rel_send = generate_off_diag(num_heteros, device= device)
+        
+        self.num_heteros = num_heteros
+        self.num_time_series = num_time_series
+        self.time_lags = time_lags 
+        self.tau = tau  
+        self.device= device
+
+    def forward(self, x, beta= None):
+        x_batch = x['input'] # bs, c, t, n
+
+        logits = self.encoder(x_batch, self.rel_rec, self.rel_send)
+        if self.training: 
+            edges = nri_gumbel_softmax(logits, self.tau, hard= False)
+        else: 
+            edges = nri_gumbel_softmax(logits, self.tau, hard= True)
+        prob = nri_softmax(logits, -1)
+        output = self.decoder(x_batch, edges, self.rel_rec, self.rel_send, self.time_lags)
+        kl_loss = kl_categorical_uniform(prob, self.num_heteros, 2)
+        recon_loss = ((x_batch[:, :, 1:, :] - output[:, :, :-1, :]) ** 2).mean() 
+        A = coo_to_adj(edges) # bs, c, c 
+
+        return {
+            'preds': output[:, :, -1:, :], 
+            'outs_label': output[:, :, -1:, :], 
+            'outs_mask': None, 
+            'kl_loss': kl_loss + recon_loss, 
+            'adj_mat': A          
+        }
+
 class HeteroNRI(nn.Module): 
     r"""
     
@@ -163,6 +238,12 @@ class HeteroNRI(nn.Module):
     Neural relational inference for interacting systems. 
     In International Conference on Machine Learning (pp. 2688-2697). PMLR.
     \"""
+
+    It differs from NRI inthat it considers the followings
+    (1) Heterogenous properties of relational graph among objects : GroupedConvolution
+    (2) Temporal-spatial property of a time-series : Fully Connected Graph is used / CausalConvolution
+    (3) Considers Periods : Dilated convolution
+    (4) GraphResidualNet is used as a decoder block
 
     # Arguments 
     ___________

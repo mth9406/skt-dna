@@ -221,7 +221,7 @@ def test_regr(args,
             preds.append(out['preds'].detach().cpu()) # bs, c, 1, n
             labels.append(x['label'].detach().cpu()) # bs, c, 1, n
             if out['adj_mat'] is not None: 
-                graphs.append(out['adj_mat'].detach().cpu()) # bs, c, n, n
+                graphs.append(out['adj_mat'].detach().cpu()) # bs, c, n, n or bs, n, n
 
         te_tot_loss += loss.detach().cpu().numpy() 
         te_mse_loss += mse_loss.detach().cpu().numpy()
@@ -335,7 +335,7 @@ def test_regr(args,
                 pos = nx.circular_layout(G)
                 nx.draw_networkx(G, pos=pos, **options)
                 plt.savefig(os.path.join(graph_path, f"graph_{enb_id}.png"), format="PNG")
-            else:
+            elif args.model_type == 'heteroNRI' or args.model_type == 'heteroSpatialNRI':
                 graph_path = os.path.join(args.model_path, f'test/graphs/{enb_id}')
                 os.makedirs(graph_path, exist_ok= True)
                 plt.figure(figsize =(15,15))
@@ -346,6 +346,17 @@ def test_regr(args,
                     adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
                     # save the adj-matrix in csv format 
                     adj_mat.to_csv(os.path.join(graph_path, f'{enb_id}_graph_{j}.csv'))
+                    G = nx.from_pandas_adjacency(adj_mat)
+                    G = nx.DiGraph(G)
+                    pos = nx.circular_layout(G)
+                    nx.draw_networkx(G, pos=pos, **options)
+                    plt.savefig(graph_file, format="PNG")
+            if args.model_type == 'nri': 
+                enb_list= list(args.decoder.values())
+                for j in range(graphs.shape[0]):
+                    graph_file = os.path.join(graph_path, f'graph_{j}.png')
+                    adj_mat = pd.DataFrame(adj_mat, columns = enb_list, index= enb_list)
+                    adj_mat.to_csv(os.path.join(graph_path, f'graph_{j}.csv'))
                     G = nx.from_pandas_adjacency(adj_mat)
                     G = nx.DiGraph(G)
                     pos = nx.circular_layout(G)

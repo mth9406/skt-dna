@@ -131,6 +131,14 @@ def main(args):
             alpha= args.alpha,
             top_k= args.top_k
         ).to(device)
+    elif args.model_type == 'nri':
+        model = NRI(
+            num_heteros= args.num_heteros,
+            num_time_series= args.num_ts,  
+            time_lags= args.lag,  
+            device= device,
+            tau= args.tau,           
+        ).to(device)
     elif args.model_type == 'heteroNRI':
         model = HeteroNRI(
             num_heteros= args.num_heteros,
