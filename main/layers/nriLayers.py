@@ -208,7 +208,7 @@ class MLPDecoder(nn.Module):
 
         msg = F.relu(self.msg_fc1(pre_msg))
         msg = F.dropout(msg, p=self.dropout_prob)
-        msg = F.relu(self.msg_fc2(msg))
+        msg = F.relu(self.msg_fc2(msg)) # bs, t, c, n
         msg = msg * single_timestep_rel_type[:, :, :, 1:2]
 
         # Aggregate all msgs to receiver

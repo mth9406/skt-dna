@@ -271,11 +271,14 @@ def test_regr(args,
             # labels = inv_min_max_scaler(labels, args.cache, args.columns)
             labels = inv_min_max_scaler_ver2(labels, args.cache, args.columns)
         
-        if len(graphs) > 0: 
+        if len(graphs) > 0 and args.model_type != 'nri': 
             graphs = torch.concat(graphs, dim=0) # num_obs, num_cells, num_time_series, num_time_series
             graphs = torch.permute(graphs, (1, 0, 2, 3)) # num_cells, num_obs, num_time_series, num_time_series
             graphs = graphs.numpy() 
-        
+        elif args.model_type == 'nri': 
+            graphs = torch.concat(graphs, dim=0) # num_obs, num_cells, num_cells
+            graphs = graphs.numpy()
+
         num_cells = labels.shape[0]
 
         # make a path to save a figures 
@@ -353,9 +356,9 @@ def test_regr(args,
                     plt.savefig(graph_file, format="PNG")
             if args.model_type == 'nri': 
                 enb_list= list(args.decoder.values())
-                for j in range(graphs.shape[0]):
+                for j in range(args.graph_time_range):
                     graph_file = os.path.join(graph_path, f'graph_{j}.png')
-                    adj_mat = pd.DataFrame(adj_mat, columns = enb_list, index= enb_list)
+                    adj_mat = pd.DataFrame(graphs[j], columns = enb_list, index= enb_list)
                     adj_mat.to_csv(os.path.join(graph_path, f'graph_{j}.csv'))
                     G = nx.from_pandas_adjacency(adj_mat)
                     G = nx.DiGraph(G)

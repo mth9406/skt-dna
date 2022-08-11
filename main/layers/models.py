@@ -192,9 +192,9 @@ class NRI(nn.Module):
         super().__init__()
 
         #edge weights have dim 2
-        self.encoder = MLPEncoder(time_lags * num_time_series, 256, 1)
+        self.encoder = MLPEncoder(time_lags * num_time_series, 256, 2)
         self.decoder = MLPDecoder(n_in_node=num_time_series,
-                                edge_types=1,
+                                edge_types=2,
                                 msg_hid=256,
                                 msg_out=256,
                                 n_hid=256)
@@ -215,16 +215,19 @@ class NRI(nn.Module):
         else: 
             edges = nri_gumbel_softmax(logits, self.tau, hard= True)
         prob = nri_softmax(logits, -1)
-        output = self.decoder(x_batch, edges, self.rel_rec, self.rel_send, self.time_lags)
+        output = self.decoder(x_batch, edges, self.rel_rec, self.rel_send, 1)
         kl_loss = kl_categorical_uniform(prob, self.num_heteros, 2)
-        recon_loss = ((x_batch[:, :, 1:, :] - output[:, :, :-1, :]) ** 2).mean() 
-        A = coo_to_adj(edges) # bs, c, c 
-
+        # recon_loss = ((x_batch[:, :, 1:, :] - output[:, :, :-1, :]) ** 2).mean() 
+        _, rel = logits.max(-1)
+        A = []
+        for i in range(rel.shape[0]):
+            A.append(coo_to_adj(rel[i], self.num_heteros)) # bs, c, c 
+        A = torch.stack(A, dim= 0).to(self.device)
         return {
             'preds': output[:, :, -1:, :], 
             'outs_label': output[:, :, -1:, :], 
             'outs_mask': None, 
-            'kl_loss': kl_loss + recon_loss, 
+            'kl_loss': -kl_loss, 
             'adj_mat': A          
         }
 
