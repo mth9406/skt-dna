@@ -30,6 +30,7 @@ print("loading the cache file")
 try: 
     with open(args.cache, 'rb') as f: 
         cache = pickle.load(f) 
+        print("loading a cache file done!")
 except: 
     cache = None
     print("loading a cache file failed...")
@@ -43,7 +44,7 @@ else:
 
 def main(args): 
     graphs_files = glob(os.path.join(args.graphs_path, f'{args.enb_name}/*.csv')) # csv files
-    print(f'the number of graphs in the path: {args.graphs_path} = {len(graphs_files)}')
+    print(f'the number of graphs in the path: {len(graphs_files)} at {args.graphs_path}')
     graphs_files = natsort.natsorted(graphs_files,reverse=False) # sort by the number of files
 
     labels_file = os.path.join(args.labels_path, f'labels_{args.enb_name}.csv')
@@ -56,7 +57,7 @@ def main(args):
     ani = SubplotAnimation(enb_num= args.enb_name, preds= preds, labels= labels, graphs = graphs, num_obs= len(graphs_files), cache= cache)
     print(f'saving the animation in path {args.animation_path}....')
 
-    ani.save(os.path.join(args.animation_path, f'test_toy_{args.enb_name}.gif'), dpi=300, writer=PillowWriter(fps=3.), savefig_kwargs={'facecolor':'white'})
+    ani.save(os.path.join(args.animation_path, f'test_{args.enb_name}.gif'), dpi=300, writer=PillowWriter(fps=3.), savefig_kwargs={'facecolor':'white'})
 
 if __name__ == '__main__':
     main(args)

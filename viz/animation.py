@@ -37,7 +37,7 @@ class SubplotAnimation(animation.TimedAnimation):
         self.num_ts = num_ts
         self.options = {
                         'node_color': 'skyblue',
-                        'node_size': 500,
+                        'node_size': 2000,
                         'width': 0.5 ,
                         'arrowstyle': '-|>',
                         'arrowsize': 20,
