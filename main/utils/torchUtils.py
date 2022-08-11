@@ -354,17 +354,17 @@ def test_regr(args,
                     pos = nx.circular_layout(G)
                     nx.draw_networkx(G, pos=pos, **options)
                     plt.savefig(graph_file, format="PNG")
-            if args.model_type == 'nri': 
-                enb_list= list(args.decoder.values())
-                for j in range(args.graph_time_range):
-                    graph_file = os.path.join(graph_path, f'graph_{j}.png')
-                    adj_mat = pd.DataFrame(graphs[j], columns = enb_list, index= enb_list)
-                    adj_mat.to_csv(os.path.join(graph_path, f'graph_{j}.csv'))
-                    G = nx.from_pandas_adjacency(adj_mat)
-                    G = nx.DiGraph(G)
-                    pos = nx.circular_layout(G)
-                    nx.draw_networkx(G, pos=pos, **options)
-                    plt.savefig(graph_file, format="PNG")
+        if args.model_type == 'nri': 
+            enb_list= list(args.decoder.values())
+            for j in range(args.graph_time_range):
+                graph_file = os.path.join(graph_path, f'graph_{j}.png')
+                adj_mat = pd.DataFrame(graphs[j], columns = enb_list, index= enb_list)
+                adj_mat.to_csv(os.path.join(graph_path, f'graph_{j}.csv'))
+                G = nx.from_pandas_adjacency(adj_mat)
+                G = nx.DiGraph(G)
+                pos = nx.circular_layout(G)
+                nx.draw_networkx(G, pos=pos, **options)
+                plt.savefig(graph_file, format="PNG")
                 # plt.close('all')
             plt.close('all')
 
