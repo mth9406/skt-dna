@@ -186,18 +186,22 @@ class NRI(nn.Module):
                  num_time_series: int, 
                  time_lags: int, 
                  tau: float, 
+                 n_hid_encoder: int, 
+                 msg_hid: int, 
+                 msg_out: int, 
+                 n_hid_decoder: int,
                  device,
                  **kwargs
                 ):
         super().__init__()
 
         #edge weights have dim 2
-        self.encoder = MLPEncoder(time_lags * num_time_series, 256, 2)
+        self.encoder = MLPEncoder(time_lags * num_time_series, n_hid_encoder, 2)
         self.decoder = MLPDecoder(n_in_node=num_time_series,
                                 edge_types=2,
-                                msg_hid=256,
-                                msg_out=256,
-                                n_hid=256)
+                                msg_hid=msg_hid,
+                                msg_out=msg_out,
+                                n_hid=n_hid_decoder)
         self.rel_rec, self.rel_send = generate_off_diag(num_heteros, device= device)
         
         self.num_heteros = num_heteros

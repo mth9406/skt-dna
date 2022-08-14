@@ -63,9 +63,18 @@ parser.add_argument('--alpha', type= float, default= 3.,
                 help= 'controls saturation rate of tanh: activation function in the graph-learning layer (default= 3.0)')      
 parser.add_argument('--beta', type= float , default= 0.5, 
                 help= 'parameter used in the GraphConvolutionModule, must be in the interval [0,1] (default= 0.5)')
-# only for the heteroNRI
+# only for the heteroNRI, NRI
 parser.add_argument('--tau', type= float, default= 1., 
                 help= 'smoothing parameter used in the Gumbel-Softmax, only used in the model: heteroNRI')
+# only fot eh NRI
+parser.add_argument('--n_hid_encoder', type = int, default= 256, 
+                help= 'dimension of a hidden vector in the nri-encoder')
+parser.add_argument('--msg_hid', type= int, default= 256, 
+                help= 'dimension of a message vector in the nri-decoder')
+parser.add_argument('--msg_out', type= int, default= 256, 
+                help= 'dimension of a message vector (out) in the nri-decoder')
+parser.add_argument('--n_hid_decoder', type= int, default= 256, 
+                help= 'dimension of a hidden vector in the nri-decoder')
 
 # To test
 parser.add_argument('--test', action='store_true', help='test')
@@ -137,7 +146,11 @@ def main(args):
             num_time_series= args.num_ts,  
             time_lags= args.lag,  
             device= device,
-            tau= args.tau,           
+            tau= args.tau,  
+            n_hid_encoder= args.n_hid_encoder,
+            msg_hid = args.msg_hid,
+            msg_out = args.msg_out,
+            n_hid_decoder = args.n_hid_decoder         
         ).to(device)
     elif args.model_type == 'heteroNRI':
         model = HeteroNRI(
