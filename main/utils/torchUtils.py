@@ -354,9 +354,12 @@ def test_regr(args,
                     pos = nx.circular_layout(G)
                     nx.draw_networkx(G, pos=pos, **options)
                     plt.savefig(graph_file, format="PNG")
+            plt.close('all')
+            
         if args.model_type == 'nri': 
             enb_list= list(args.decoder.values())
             for j in range(args.graph_time_range):
+                plt.figure(figsize =(30,30))
                 graph_file = os.path.join(graph_path, f'graph_{j}.png')
                 adj_mat = pd.DataFrame(graphs[j], columns = enb_list, index= enb_list)
                 adj_mat.to_csv(os.path.join(graph_path, f'graph_{j}.csv'))
@@ -365,18 +368,13 @@ def test_regr(args,
                 pos = nx.circular_layout(G)
                 nx.draw_networkx(G, pos=pos, **options)
                 plt.savefig(graph_file, format="PNG")
-                # plt.close('all')
-            plt.close('all')
+                plt.close('all')
 
     perf = {
         'r2': te_r2,
         'mae': te_mae,
         'mse': te_mse
     }
-    # perf = {
-    #     'mae': te_mae,
-    #     'mse': te_mse
-    # }
 
     return perf 
 
