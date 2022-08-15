@@ -219,9 +219,9 @@ class NRI(nn.Module):
         else: 
             edges = nri_gumbel_softmax(logits, self.tau, hard= True)
         prob = nri_softmax(logits, -1)
-        output = self.decoder(x_batch, edges, self.rel_rec, self.rel_send, 1)
+        output = self.decoder(x_batch, edges, self.rel_rec, self.rel_send, self.time_lags)
         kl_loss = kl_categorical_uniform(prob, self.num_heteros, 2)
-        # recon_loss = ((x_batch[:, :, 1:, :] - output[:, :, :-1, :]) ** 2).mean() 
+        recon_loss = ((x_batch[:, :, 1:, :] - output[:, :, :-1, :]) ** 2).mean() 
         _, rel = logits.max(-1)
         A = []
         for i in range(rel.shape[0]):
@@ -231,7 +231,7 @@ class NRI(nn.Module):
             'preds': output[:, :, -1:, :], 
             'outs_label': output[:, :, -1:, :], 
             'outs_mask': None, 
-            'kl_loss': -kl_loss, 
+            'kl_loss': -kl_loss+recon_loss, 
             'adj_mat': A          
         }
 

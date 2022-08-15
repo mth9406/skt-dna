@@ -262,6 +262,7 @@ class MLPDecoder(nn.Module):
         for i in range(len(preds)):
             output[:, i:i+1, :, :] = preds[i]
 
-        pred_all = output[:, :(inputs.size(1) - 1), :, :]
+        # pred_all = output[:, :(inputs.size(1) - 1), :, :]
+        pred_all = output[:, :, :, :]
 
         return pred_all.transpose(1, 2).contiguous()
