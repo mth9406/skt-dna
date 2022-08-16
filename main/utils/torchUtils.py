@@ -331,6 +331,7 @@ def test_regr(args,
             if args.model_type == 'mtgnn': 
                 adj_mat = model.gen_adj[i](idx).data.cpu().numpy() 
                 adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
+                adj_mat.to_csv(os.path.join(graph_path, f'graph_{enb_id}.csv'))
                 plt.figure(figsize =(15,15))
                 # plt.xkcd()
                 G = nx.from_pandas_adjacency(adj_mat, create_using=nx.DiGraph)
