@@ -19,32 +19,34 @@ class TimeSeriesDataset(Dataset):
     D: time-interval (depreciated)
     y: independent variable (target variable - not be used in this research) 
     """
-    def __init__(self, X, M, D= None, lag= 1):
+    def __init__(self, X, M, D= None, lag= 1, pred_steps= 1):
         super().__init__()
         # X: (5363, 2293, 10)
         # M: (5363, 2293, 10)
         self.X, self.M = X, M
         self.D = D
         self.lag = lag
+        self.pred_steps = pred_steps 
 
     def __getitem__(self, index):
         if self.D is None: 
             return {
                 "input": self.X[:, index:index+self.lag, :],
                 "mask": self.M[:, index:index+self.lag, :],
-                "label": self.X[:, index+self.lag:index+self.lag+1, :], 
-                "label_mask": self.M[:, index+self.lag:index+self.lag+1, :]
+                "label": self.X[:, index+self.lag:index+self.lag+self.pred_steps, :], 
+                "label_mask": self.M[:, index+self.lag:index+self.lag+self.pred_steps, :]
             }
         else: 
+            # depreciated...
             return {
                 "input": self.X[:, index:index+self.lag, :],
                 "mask": self.M[:, index:index+self.lag, :],
-                "label": self.X[:, index+self.lag:index+self.lag+1, :],
+                "label": self.X[:, index+self.lag:index+self.lag+self.pred_steps, :],
                 "time_interval":self.D[index]               
             }
 
     def __len__(self): 
-        return self.X.shape[1]-self.lag
+        return self.X.shape[1]-self.lag-self.pred_steps+1
 
 def load_skt(args): 
     r"""

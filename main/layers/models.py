@@ -371,6 +371,92 @@ class HeteroNRI(nn.Module):
             'adj_mat': A
         }
 
+class HeteroNRIMulti(nn.Module): 
+    r"""    
+
+    This work is based on the work by 
+    
+    \"""
+    Kipf, T., Fetaya, E., Wang, K. C., Welling, M., & Zemel, R. (2018, July). 
+    Neural relational inference for interacting systems. 
+    In International Conference on Machine Learning (pp. 2688-2697). PMLR.
+    \"""
+
+    It differs from NRI inthat it considers the followings
+    (1) Heterogenous properties of relational graph among objects : GroupedConvolution
+    (2) Temporal-spatial property of a time-series : Fully Connected Graph is used / CausalConvolution
+    (3) Considers Periods : Dilated convolution
+    (4) GraphResidualNet is used as a decoder block
+
+    In addition, 
+    it provides 'online learning' structure and 'multi-time stamp' prediction.
+    """
+
+    def __init__(self, backbone, pred_steps, device):
+        super().__init__() 
+        self.backbone = backbone 
+        self.multi_step_head_label = nn.ConvTranspose2d(
+                                                        backbone.num_heteros,
+                                                        backbone.num_heteros,
+                                                        (pred_steps, 1),
+                                                        groups = backbone.num_heteros
+                                                        )
+        self.multi_step_head_mask = nn.ConvTranspose2d(
+                                                        backbone.num_heteros,
+                                                        backbone.num_heteros,
+                                                        (pred_steps, 1),
+                                                        groups = backbone.num_heteros
+                                                        )
+        self.device= device
+
+        self.pred_steps = pred_steps
+
+    def forward(self, x, beta): 
+        
+        x_batch, mask_batch = x['input'], x['mask']
+        
+        # encoder
+        h = self.backbone.glem(x_batch) # bs, c, n, n 
+        z = F.softmax(h, dim= -2) # softmax along row dimension. (col-sum = 1.)
+        # obtain kl_loss 
+        kl_loss = kl_categorical_uniform(z, self.backbone.num_ts)
+        if self.training: 
+            A = gumbel_softmax(h, self.backbone.tau, hard= False, dim=-2)
+        else: 
+            A = gumbel_softmax(h, self.backbone.tau, hard= True, dim=-2)
+        # decoder 
+        x_batch = self.backbone.projection(x_batch) 
+        bs, c, t, n = x_batch.shape 
+
+        outs_label = torch.zeros((bs, c * (self.backbone.num_blocks+2), t, n)).to(self.device) # to collect outputs from modules
+        out = x_batch.clone().detach()
+        outs_label[:, ::(self.backbone.num_blocks+2), ...] = out
+        for i in range(self.backbone.num_blocks): 
+            tc_out, out = getattr(self.backbone, f'hetero_block{i}')(out, A, beta)
+            # x_batch += tc_out 
+            outs_label[:, (i+1)::(self.backbone.num_blocks+2), ...] = tc_out
+            # x_batch = torch.cat([x_batch, tc_out], dim= 1)
+        # x_batch += out # bs, c, n, l 
+        outs_label[:, (self.backbone.num_blocks+1)::(self.backbone.num_blocks+2), ...] = out
+        # x_batch = torch.cat([x_batch, out], dim=1)
+        
+        # fc_out 
+        outs_label = self.backbone.fc_decode(outs_label)
+        outs_label = self.backbone.fc_out(outs_label) # bs, c, 1, D
+        outs_mask = self.backbone.mask_block(mask_batch) # masks
+        
+        # multi-time stamp prediction
+        outs_label = torch.tanh(self.multi_step_head_label(outs_label))
+        outs_mask = torch.sigmoid(self.multi_step_head_label(outs_mask))
+
+        return {
+            'preds': outs_label * outs_mask, 
+            'outs_label': outs_label, 
+            'outs_mask': outs_mask, 
+            'kl_loss': kl_loss, 
+            'adj_mat': A
+        }    
+
 class HeteroSpatialNRI(nn.Module): 
     r"""
     
