@@ -52,6 +52,8 @@ parser.add_argument('--delta', type= float, default=0.01, help='significant impr
 parser.add_argument('--print_log_option', type= int, default= 10, help= 'print training loss every print_log_option')
 parser.add_argument('--verbose', action= 'store_true', 
                 help= 'print logs about early-stopping')
+parser.add_argument('--train_ar', action= 'store_true', 
+                help= 'train autoregressive predictions if set true')
 
 # model options
 parser.add_argument('--model_path', type= str, default= './data/skt/model',
@@ -157,8 +159,10 @@ def main(args):
     ) 
 
     # train the multi-step heads using the training data 
-    train(args, model, train_loader, valid_loader, optimizer, criterion, early_stopping, device)
-    
+    if args.train_ar: 
+        train(args, model, train_loader, valid_loader, optimizer, criterion, early_stopping, device)
+    else: 
+        print('skip training auto-regressives predictions...')
     # test the multi-step HeteroNRI (model) using test data 
     # fine tune the model every 'args.fine_tunning_every'
     # test the fine-tuned model using the next batch of the test dataset.
@@ -322,7 +326,7 @@ def main(args):
                 fig_file = os.path.join(fig_path, f'figure_{enb_id}.png')
                 fig.savefig(fig_file)
                 plt.close('all')
-                
+
             for i in tqdm(range(num_cells), total= num_cells):
                 graph_path = os.path.join(args.model_path, f'test/graphs_{t}_step/{enb_id}')
                 os.makedirs(graph_path, exist_ok= True)
