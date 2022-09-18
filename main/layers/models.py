@@ -408,14 +408,14 @@ class HeteroNRIMulti(nn.Module):
         outs = torch.zeros((bs, c, self.pred_steps, d), requires_grad= False, device= self.device)
         outs_label = torch.zeros((bs, c, self.pred_steps, d), requires_grad= False, device= self.device)
         outs_mask = torch.zeros((bs, c, self.pred_steps, d), requires_grad= False, device= self.device)
-        adj_mats = torch.zeros((self.pred_steps, bs, c, d, d), requires_grad= False, device= self.device)
+        adj_mats = torch.zeros((bs, self.pred_steps, c, d, d), requires_grad= False, device= self.device)
         kl_loss = 0 
 
         out = self.backbone.forward(x, beta)
         outs[...,0:1,:] = out['preds']
         outs_label[...,0:1,:] = out['outs_label']
         outs_mask[...,0:1,:] = out['outs_mask']
-        adj_mats[0:1, ...]  = out['adj_mat']
+        adj_mats[:, 0, ...]  = out['adj_mat']
         kl_loss = kl_loss + out['kl_loss'] if out['kl_loss'] is not None else None 
 
         for t in range(1, self.pred_steps): 
@@ -428,7 +428,7 @@ class HeteroNRIMulti(nn.Module):
             outs[...,t:t+1,:] = out['preds']
             outs_label[...,t:t+1,:] = out['outs_label']
             outs_mask[...,t:t+1,:] = out['outs_mask']
-            adj_mats[t, ...]  = out['adj_mat']
+            adj_mats[:,t, ...]  = out['adj_mat']
             kl_loss = kl_loss + out['kl_loss'] if out['kl_loss'] is not None else None
 
         if kl_loss is not None: 

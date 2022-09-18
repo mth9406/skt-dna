@@ -264,8 +264,8 @@ def main(args):
 
         predictions = torch.concat(predictions, dim=0) # num_obs, num_cells, preds_steps, num_time_series
         labels = torch.concat(labels, dim=0) # num_obs, num_cells, preds_steps, num_time_series
-        graphs = torch.concat(graphs, dim=0) # num_preds_steps, num_obs, num_cells, num_time_series, num_time_series
-        graphs = torch.permute(graphs, (0, 2, 1, 3, 4)) # num_preds_steps, num_cells, num_obs, num_time_series, num_time_series
+        graphs = torch.concat(graphs, dim=0) # num_obs, num_preds_steps, num_cells, num_time_series, num_time_series
+        graphs = torch.permute(graphs, (1, 2, 0, 3, 4)) # num_preds_steps, num_cells, num_obs, num_time_series, num_time_series
         graphs = graphs.numpy()         
 
         # graph-options
@@ -314,14 +314,15 @@ def main(args):
                 # make a path to save a figures 
                 fig_path = os.path.join(args.model_path, f'test/figures/{t}_step')
                 if not os.path.exists(fig_path):
-                    print("Making a path to save figures...")
+                    # print("Making a path to save figures...")
                     print(f"{fig_path}")
                     os.makedirs(fig_path, exist_ok= True)
-                else:
-                    print("The path to save figures already exists, skip making the path...")
+                # else:
+                #     print("The path to save figures already exists, skip making the path...")
                 fig_file = os.path.join(fig_path, f'figure_{enb_id}.png')
                 fig.savefig(fig_file)
-
+                plt.close('all')
+                
             for i in tqdm(range(num_cells), total= num_cells):
                 graph_path = os.path.join(args.model_path, f'test/graphs_{t}_step/{enb_id}')
                 os.makedirs(graph_path, exist_ok= True)
