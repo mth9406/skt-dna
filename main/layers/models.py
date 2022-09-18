@@ -395,67 +395,52 @@ class HeteroNRIMulti(nn.Module):
     def __init__(self, backbone, pred_steps, device):
         super().__init__() 
         self.backbone = backbone 
-        self.multi_step_head_label = nn.ConvTranspose2d(
-                                                        backbone.num_heteros,
-                                                        backbone.num_heteros,
-                                                        (pred_steps, 1),
-                                                        groups = backbone.num_heteros
-                                                        )
-        self.multi_step_head_mask = nn.ConvTranspose2d(
-                                                        backbone.num_heteros,
-                                                        backbone.num_heteros,
-                                                        (pred_steps, 1),
-                                                        groups = backbone.num_heteros
-                                                        )
         self.device= device
 
         self.pred_steps = pred_steps
 
     def forward(self, x, beta): 
-        
-        x_batch, mask_batch = x['input'], x['mask']
-        
-        # encoder
-        h = self.backbone.glem(x_batch) # bs, c, n, n 
-        z = F.softmax(h, dim= -2) # softmax along row dimension. (col-sum = 1.)
-        # obtain kl_loss 
-        kl_loss = kl_categorical_uniform(z, self.backbone.num_ts)
-        if self.training: 
-            A = gumbel_softmax(h, self.backbone.tau, hard= False, dim=-2)
-        else: 
-            A = gumbel_softmax(h, self.backbone.tau, hard= True, dim=-2)
-        # decoder 
-        x_batch = self.backbone.projection(x_batch) 
-        bs, c, t, n = x_batch.shape 
+        return self.auto_regressive_forward(x, beta)     
 
-        outs_label = torch.zeros((bs, c * (self.backbone.num_blocks+2), t, n)).to(self.device) # to collect outputs from modules
-        out = x_batch.clone().detach()
-        outs_label[:, ::(self.backbone.num_blocks+2), ...] = out
-        for i in range(self.backbone.num_blocks): 
-            tc_out, out = getattr(self.backbone, f'hetero_block{i}')(out, A, beta)
-            # x_batch += tc_out 
-            outs_label[:, (i+1)::(self.backbone.num_blocks+2), ...] = tc_out
-            # x_batch = torch.cat([x_batch, tc_out], dim= 1)
-        # x_batch += out # bs, c, n, l 
-        outs_label[:, (self.backbone.num_blocks+1)::(self.backbone.num_blocks+2), ...] = out
-        # x_batch = torch.cat([x_batch, out], dim=1)
-        
-        # fc_out 
-        outs_label = self.backbone.fc_decode(outs_label)
-        outs_label = self.backbone.fc_out(outs_label) # bs, c, 1, D
-        outs_mask = self.backbone.mask_block(mask_batch) # masks
-        
-        # multi-time stamp prediction
-        outs_label = torch.tanh(self.multi_step_head_label(outs_label))
-        outs_mask = torch.sigmoid(self.multi_step_head_label(outs_mask))
+    def auto_regressive_forward(self, x, beta): 
+        x_batch, mask_batch = x['input'], x['mask']
+        bs, c, n, d = x_batch.shape
+        outs = torch.zeros((bs, c, self.pred_steps, d), requires_grad= False, device= self.device)
+        outs_label = torch.zeros((bs, c, self.pred_steps, d), requires_grad= False, device= self.device)
+        outs_mask = torch.zeros((bs, c, self.pred_steps, d), requires_grad= False, device= self.device)
+        adj_mats = torch.zeros((self.pred_steps, bs, c, d, d), requires_grad= False, device= self.device)
+        kl_loss = 0 
+
+        out = self.backbone.forward(x, beta)
+        outs[...,0:1,:] = out['preds']
+        outs_label[...,0:1,:] = out['outs_label']
+        outs_mask[...,0:1,:] = out['outs_mask']
+        adj_mats[0:1, ...]  = out['adj_mat']
+        kl_loss = kl_loss + out['kl_loss'] if out['kl_loss'] is not None else None 
+
+        for t in range(1, self.pred_steps): 
+            ar_x_batch, ar_mask_batch = torch.cat((x_batch[..., t:, :], outs_label[..., :t, :]), dim= -2), torch.cat((mask_batch[..., t:, :], outs_mask[..., :t, :]), dim= -2)
+            ar_x = {
+                'input': ar_x_batch,
+                'mask': ar_mask_batch
+            }
+            out = self.backbone.forward(ar_x, beta)
+            outs[...,t:t+1,:] = out['preds']
+            outs_label[...,t:t+1,:] = out['outs_label']
+            outs_mask[...,t:t+1,:] = out['outs_mask']
+            adj_mats[t, ...]  = out['adj_mat']
+            kl_loss = kl_loss + out['kl_loss'] if out['kl_loss'] is not None else None
+
+        if kl_loss is not None: 
+            kl_loss /= self.pred_steps
 
         return {
-            'preds': outs_label * outs_mask, 
+            'preds': outs, 
             'outs_label': outs_label, 
             'outs_mask': outs_mask, 
             'kl_loss': kl_loss, 
-            'adj_mat': A
-        }    
+            'adj_mat': adj_mats            
+        }
 
 class HeteroSpatialNRI(nn.Module): 
     r"""

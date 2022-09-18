@@ -1,5 +1,4 @@
 import os
-from re import X 
 import sys 
 import argparse
 import json 
@@ -173,20 +172,6 @@ def main(args):
 
     criterion_mask = nn.BCELoss()
     # test_loader_iter = iter(test_loader)
-    
-    x_train = {
-        'input':None,
-        'mask':None,
-        'label':None,
-        'label_mask':None
-    }
-    
-    x_test = {
-        'input':None,
-        'mask':None,
-        'label':None,
-        'label_mask':None
-    }
 
     predictions = []
     labels = []
@@ -268,16 +253,6 @@ def main(args):
     if args.save_results: 
         
         print('saving the predictions...')
- 
-        # make a path to save a figures 
-        fig_path = os.path.join(args.model_path, 'test/figures')
-        if not os.path.exists(fig_path):
-            print("Making a path to save figures...")
-            print(f"{fig_path}")
-            os.makedirs(fig_path, exist_ok= True)
-        else:
-            print("The path to save figures already exists, skip making the path...")
-
         # make a path to save a graphs 
         graph_path = os.path.join(args.model_path, 'test/graphs')
         if not os.path.exists(graph_path):
@@ -288,27 +263,10 @@ def main(args):
             print("The path to save graphs already exists, skip making the path...")
 
         predictions = torch.concat(predictions, dim=0) # num_obs, num_cells, preds_steps, num_time_series
-        predictions = torch.permute(predictions[:,:,-1, :], (1, 0, 2)) # num_cells, num_obs, num_time_series 
-        predictions = predictions.numpy()
-        if args.cache is not None: 
-            # preds = inv_min_max_scaler(preds, args.cache, args.columns)
-            predictions = inv_min_max_scaler_ver2(predictions, args.cache, args.columns)
-
         labels = torch.concat(labels, dim=0) # num_obs, num_cells, preds_steps, num_time_series
-        labels = torch.permute(labels[:,:,-1, :], (1, 0, 2)) # num_cells, num_obs, num_time_series
-        labels = labels.numpy()
-        num_cells = labels.shape[0]
-        if args.cache is not None: 
-            # labels = inv_min_max_scaler(labels, args.cache, args.columns)
-            labels = inv_min_max_scaler_ver2(labels, args.cache, args.columns)
-
-        graphs = torch.concat(graphs, dim=0) # num_obs, num_cells, num_time_series, num_time_series
-        graphs = torch.permute(graphs, (1, 0, 2, 3)) # num_cells, num_obs, num_time_series, num_time_series
+        graphs = torch.concat(graphs, dim=0) # num_preds_steps, num_obs, num_cells, num_time_series, num_time_series
+        graphs = torch.permute(graphs, (0, 2, 1, 3, 4)) # num_preds_steps, num_cells, num_obs, num_time_series, num_time_series
         graphs = graphs.numpy()         
-        
-        print('The shape of predictions: ', predictions.shape)
-        print('The shape of labels: ', labels.shape)
-        print('The shape of graphs: ', graphs.shape)
 
         # graph-options
         options = {
@@ -320,44 +278,67 @@ def main(args):
                     'alpha' : 1,
                     'font_size' : 15
                 }
-        
-        # saving figures: predictions vs labels
-        # saving graphs 
-        for i in tqdm(range(num_cells), total= num_cells):
-            enb_id = args.decoder.get(i)
-            write_csv(args, 'test/predictions', f'predictions_{enb_id}.csv', predictions[i, ...], args.columns)
-            write_csv(args, 'test/labels', f'labels_{enb_id}.csv', labels[i, ...], args.columns)   
-            
-            fig, axes = plt.subplots(len(args.columns), 1, figsize= (10,3*len(args.columns)))
 
-            for j in range(len(args.columns)):
-                col_name = args.columns[j]
-                fig.axes[j].set_title(f'time-seris plot: {col_name}')
-                fig.axes[j].plot(predictions[i,:,j], label= 'prediction')
-                fig.axes[j].plot(labels[i,:,j], label= 'label')
-                fig.axes[j].legend()
-            
-            fig.suptitle(f"Prediction and True label plot of {enb_id}", fontsize=20, position= (0.5, 1.0+0.05))
-            fig.tight_layout()
-            fig_file = os.path.join(fig_path, f'figure_{enb_id}.png')
-            fig.savefig(fig_file)
+        for t in range(args.pred_steps):
+            p = torch.permute(predictions[:,:,t, :], (1, 0, 2)) # num_cells, num_obs, num_time_series 
+            p = p.numpy()
+            if args.cache is not None: 
+                # preds = inv_min_max_scaler(preds, args.cache, args.columns)
+                p = inv_min_max_scaler_ver2(p, args.cache, args.columns)
+
+            l = torch.permute(labels[:,:,t, :], (1, 0, 2)) # num_cells, num_obs, num_time_series
+            l = l.numpy()
+            num_cells = l.shape[0]
+            if args.cache is not None: 
+                # labels = inv_min_max_scaler(labels, args.cache, args.columns)
+                l = inv_min_max_scaler_ver2(l, args.cache, args.columns)
         
-            graph_path = os.path.join(args.model_path, f'test/graphs/{enb_id}')
-            os.makedirs(graph_path, exist_ok= True)
-            plt.figure(figsize =(15,15))
-            for j in range(args.graph_time_range):
-                # num_obs, num_time_series, num_time_series
-                graph_file = os.path.join(graph_path, f'{enb_id}_graph_{j}.png') 
-                adj_mat = np.transpose(graphs[i, j, ...]) # num_time_series, num_time_series 
-                adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
-                # save the adj-matrix in csv format 
-                adj_mat.to_csv(os.path.join(graph_path, f'{enb_id}_graph_{j}.csv'))
-                G = nx.from_pandas_adjacency(adj_mat, create_using=nx.DiGraph)
-                G = nx.DiGraph(G)
-                pos = nx.circular_layout(G)
-                nx.draw_networkx(G, pos=pos, **options)
-                plt.savefig(graph_file, format="PNG")
-            plt.close('all')
+            # saving figures: predictions vs labels
+            # saving graphs 
+            for i in tqdm(range(num_cells), total= num_cells):
+                enb_id = args.decoder.get(i)
+                write_csv(args, f'test/predictions_{t}_step', f'predictions_{enb_id}.csv', p[i, ...], args.columns)
+                write_csv(args, f'test/labels_{t}_step', f'labels_{enb_id}.csv', l[i, ...], args.columns)   
+                
+                fig, axes = plt.subplots(len(args.columns), 1, figsize= (10,3*len(args.columns)))
+
+                for j in range(len(args.columns)):
+                    col_name = args.columns[j]
+                    fig.axes[j].set_title(f'time-seris plot: {col_name}')
+                    fig.axes[j].plot(p[i,:,j], label= 'prediction')
+                    fig.axes[j].plot(l[i,:,j], label= 'label')
+                    fig.axes[j].legend()
+                
+                fig.suptitle(f"Prediction and True label plot of {enb_id}", fontsize=20, position= (0.5, 1.0+0.05))
+                fig.tight_layout()
+                # make a path to save a figures 
+                fig_path = os.path.join(args.model_path, f'test/figures/{t}_step')
+                if not os.path.exists(fig_path):
+                    print("Making a path to save figures...")
+                    print(f"{fig_path}")
+                    os.makedirs(fig_path, exist_ok= True)
+                else:
+                    print("The path to save figures already exists, skip making the path...")
+                fig_file = os.path.join(fig_path, f'figure_{enb_id}.png')
+                fig.savefig(fig_file)
+
+            for i in tqdm(range(num_cells), total= num_cells):
+                graph_path = os.path.join(args.model_path, f'test/graphs_{t}_step/{enb_id}')
+                os.makedirs(graph_path, exist_ok= True)
+                plt.figure(figsize =(15,15))
+                for j in range(args.graph_time_range):
+                    # num_obs, num_time_series, num_time_series
+                    graph_file = os.path.join(graph_path, f'{enb_id}_graph_{j}.png') 
+                    adj_mat = np.transpose(graphs[t, i, j, ...]) # num_time_series, num_time_series 
+                    adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
+                    # save the adj-matrix in csv format 
+                    adj_mat.to_csv(os.path.join(graph_path, f'{enb_id}_graph_{j}.csv'))
+                    G = nx.from_pandas_adjacency(adj_mat, create_using=nx.DiGraph)
+                    G = nx.DiGraph(G)
+                    pos = nx.circular_layout(G)
+                    nx.draw_networkx(G, pos=pos, **options)
+                    plt.savefig(graph_file, format="PNG")
+                plt.close('all')
 
     return perf
 
