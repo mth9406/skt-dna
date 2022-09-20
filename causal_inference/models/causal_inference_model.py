@@ -84,6 +84,7 @@ class CausalInferenceModel(nn.Module):
         
         # graph sampling layer
         self.glem = GraphLearningEncoderModule(num_heteros, time_lags, num_src, num_dst, device)
+        self.reconstruct_src = nn.Conv2d(num_heteros, num_heteros, kernel_size= (1,1), groups= num_heteros, padding= 0, bias= False)
         
         # graph convolution layers
         for i in range(num_gcn_blocks): 
@@ -121,16 +122,16 @@ class CausalInferenceModel(nn.Module):
         for i in range(1, self.num_blocks_dst):
             h_x_res = h_x 
             h_x = F.leaky_relu((1-self.beta) * getattr(self, f'tcm_src{i}')(h_x) +  self.beta * h_x_res) 
-        h_x = x_batch + h_x # change in 'status' + the original 'status'
-        h_x = self.decode_src(h_x) # bs, c, 1, num_src
+        h_x = self.decode_src(h_x+x_batch)
+        h_x = torch.tanh(h_x)# bs, c, 1, num_src # change in 'status' + the original 'status'
 
         # (2.2) obtain representation of response variables 
         h_y = self.tcm_dst0(y_batch)
         for i in range(1, self.num_blocks_src):
             h_y_res = h_y 
             h_y = F.leaky_relu((1-self.beta) * getattr(self, f'tcm_dst{i}')(h_y) +  self.beta * h_y_res) 
-        h_y = y_batch + h_y # change in 'status' + the original 'status'
-        h_y = self.decode_dst(h_y) # bs, c, 1, num_dst
+        h_y = self.decode_dst(h_y+y_batch) # change in 'status' + the original 'status'
+        h_y = torch.tanh(h_y) # bs, c, 1, num_dst
         
         # (3) graph convolution
         for i in range(self.num_gcn_blocks-1): 
@@ -191,8 +192,6 @@ class CausalInferenceModel(nn.Module):
     def test_step(self, batch):
 
         out = self.forward(batch)
-        label_loss = torch.mean((out['res_label'] - batch['res_label'])**2)
-        exp_loss = torch.mean(out['exp_label']- batch['exp_label']**2)
         probs = F.softmax(out['logits'], dim= -1)
         kl_loss = kl_categorical_uniform(probs, self.num_dst*self.num_src) 
 
