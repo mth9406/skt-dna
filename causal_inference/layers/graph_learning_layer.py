@@ -67,8 +67,8 @@ class GraphLearningEncoder(nn.Module):
         bs, c, t, num_src = x.shape
         bs, c, _, num_dst = y.shape
         # (0) x_cause embedding 
-        x_cause = self.tcm(x) # bs, c, 1, num_src
-        x_cause = x_cause[..., :-1, :].transpose(-2, -1) # bs, c, num_src, 1
+        x_cause = self.tcm(x[..., :-1, :]) # bs, c, 1, num_src
+        x_cause = x_cause[..., -1:, :].transpose(-2, -1) # bs, c, num_src, 1
         y_response = y[..., -1:, :].transpose(-2, -1) # bs, c, num_dst, 1
         # (1) node2edge 
         h_e = torch.cat([x_cause[..., src, :], y_response[..., dst, :]], dim= 3) # bs, c, num_src * num_dst, 2

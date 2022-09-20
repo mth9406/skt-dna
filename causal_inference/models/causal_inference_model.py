@@ -76,11 +76,32 @@ class CausalInferenceModel(nn.Module):
         # tcm_src: To learn the representation of explanatory variables 
         for i in range(num_blocks_src): 
             setattr(self, f'tcm_src{i}', TemporalConvolutionModule(num_heteros, num_heteros, num_heteros))
-        self.decode_src = nn.Conv2d(num_heteros, num_heteros, (time_lags, 1), groups= num_heteros)
+        self.decode_src = nn.Sequential(
+            ResidualAdd(nn.Sequential(
+            nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, groups= num_heteros, padding= 0), 
+            nn.BatchNorm2d(num_heteros), 
+            nn.LeakyReLU(negative_slope= 0.5),
+            nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, padding= 0)
+            )),
+            nn.LeakyReLU(negative_slope= 0.5),
+            nn.Conv2d(num_heteros, num_heteros, (time_lags-1, 1), groups= num_heteros),
+            nn.Tanh()
+        )
+            
         # tcm_dst: To learn the representation of response (target) variables 
         for i in range(num_blocks_dst): 
             setattr(self, f'tcm_dst{i}', TemporalConvolutionModule(num_heteros, num_heteros, num_heteros))
-        self.decode_dst = nn.Conv2d(num_heteros, num_heteros, (time_lags, 1), groups= num_heteros)
+        self.decode_dst = nn.Sequential(
+            ResidualAdd(nn.Sequential(
+            nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, groups= num_heteros, padding= 0), 
+            nn.BatchNorm2d(num_heteros), 
+            nn.LeakyReLU(negative_slope= 0.5),
+            nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, padding= 0)
+            )),
+            nn.LeakyReLU(negative_slope= 0.5),
+            nn.Conv2d(num_heteros, num_heteros, (time_lags-1, 1), groups= num_heteros),
+            nn.Tanh()
+        )
         
         # graph sampling layer
         self.glem = GraphLearningEncoderModule(num_heteros, time_lags, num_src, num_dst, device)
@@ -118,28 +139,23 @@ class CausalInferenceModel(nn.Module):
         adj_mat = gumbel_softmax(logits, self.tau, hard= False, dim= -1)
         
         # (2.1) obtain representation of explanatory variables
-        h_x = self.tcm_src0(x_batch)
+        h_x = self.tcm_src0(x_batch[..., :-1, :])
         for i in range(1, self.num_blocks_dst):
             h_x_res = h_x 
-            h_x = F.leaky_relu((1-self.beta) * getattr(self, f'tcm_src{i}')(h_x) +  self.beta * h_x_res) 
-        h_x = x_batch[...,-1:,:] + torch.tanh(self.decode_src(h_x))
+            h_x = F.leaky_relu(getattr(self, f'tcm_src{i}')(h_x) + h_x_res) 
+        h_x = x_batch[...,-1:,:] + self.decode_src(h_x)
 
         # (2.2) obtain representation of response variables 
-        h_y = self.tcm_dst0(y_batch)
+        h_y = self.tcm_dst0(y_batch[..., :-1, :])
         for i in range(1, self.num_blocks_src):
             h_y_res = h_y 
-            h_y = F.leaky_relu((1-self.beta) * getattr(self, f'tcm_dst{i}')(h_y) +  self.beta * h_y_res) 
+            h_y = F.leaky_relu(getattr(self, f'tcm_dst{i}')(h_y) +  h_y_res) 
         
         # (3) graph convolution
         for i in range(self.num_gcn_blocks): 
-            # h_x, h_y = getattr(self, f'gcn{i}')(h_x, h_y, adj_mat)
             h_y = getattr(self, f'gcn{i}')(h_x, h_y, adj_mat)
-            # h_x, h_y = F.leaky_relu(h_x), F.leaky_relu(h_y)
             h_y = F.leaky_relu(h_y) 
-        # h_x, h_y =getattr(self, f'gcn{self.num_gcn_blocks-1}')(h_x, h_y, adj_mat)
-        # h_y = getattr(self, f'gcn{self.num_gcn_blocks-1}')(h_x, h_y, adj_mat)
-        # h_x, h_y = torch.tanh(h_x), torch.tanh(h_y)
-        h_y = y_batch[..., -1:, :] + torch.tanh(self.decode_dst(h_y))
+        h_y = y_batch[..., -1:, :] + self.decode_dst(h_y)
 
         # (4) relation 
         relation = gumbel_softmax(logits, self.tau, hard= True, dim= -1)

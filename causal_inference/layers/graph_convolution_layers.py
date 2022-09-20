@@ -21,6 +21,7 @@ class GCNBlock(nn.Module):
         """
         emb_src_t, emb_dst_t = emb_src.transpose(2,3), emb_dst.transpose(2,3) # (bs, c, num_src (num_dst), 1) 
         adj_mat2dst = adj_mat.transpose(2,3) # aggregate dst nodes # (bs, c, num_dst, num_src)
+        adj_mat2dst /= torch.sum(adj_mat2dst, dim= -1, keepdim= True)
 
         # emb_src_t = self.self_conv2d_src(emb_src_t) + self.conv2d_src(adj_mat@emb_dst_t)
         emb_dst_t = self.self_conv2d_dst(emb_dst_t) + self.conv2d_dst(adj_mat2dst@emb_src_t)
