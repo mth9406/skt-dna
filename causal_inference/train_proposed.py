@@ -254,6 +254,7 @@ if __name__ == '__main__':
         
         graphs = np.transpose(graphs, (1, 0, 2, 3)) # c, num_obs, num_src, num_dst
         for i in tqdm(range(num_cells), total= num_cells):
+            enb_id = args.decoder.get(i)
             graph_path = os.path.join(args.model_path, f'test/graphs/1_step/{enb_id}')
             os.makedirs(graph_path, exist_ok= True)
             plt.figure(figsize =(15,15))

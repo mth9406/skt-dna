@@ -122,27 +122,24 @@ class CausalInferenceModel(nn.Module):
         for i in range(1, self.num_blocks_dst):
             h_x_res = h_x 
             h_x = F.leaky_relu((1-self.beta) * getattr(self, f'tcm_src{i}')(h_x) +  self.beta * h_x_res) 
-        h_x = self.decode_src(h_x+x_batch)
-        h_x = torch.tanh(h_x)# bs, c, 1, num_src # change in 'status' + the original 'status'
+        h_x = x_batch[...,-1:,:] + torch.tanh(self.decode_src(h_x))
 
         # (2.2) obtain representation of response variables 
         h_y = self.tcm_dst0(y_batch)
         for i in range(1, self.num_blocks_src):
             h_y_res = h_y 
             h_y = F.leaky_relu((1-self.beta) * getattr(self, f'tcm_dst{i}')(h_y) +  self.beta * h_y_res) 
-        h_y = self.decode_dst(h_y+y_batch) # change in 'status' + the original 'status'
-        h_y = torch.tanh(h_y) # bs, c, 1, num_dst
         
         # (3) graph convolution
-        for i in range(self.num_gcn_blocks-1): 
+        for i in range(self.num_gcn_blocks): 
             # h_x, h_y = getattr(self, f'gcn{i}')(h_x, h_y, adj_mat)
             h_y = getattr(self, f'gcn{i}')(h_x, h_y, adj_mat)
             # h_x, h_y = F.leaky_relu(h_x), F.leaky_relu(h_y)
             h_y = F.leaky_relu(h_y) 
         # h_x, h_y =getattr(self, f'gcn{self.num_gcn_blocks-1}')(h_x, h_y, adj_mat)
-        h_y =getattr(self, f'gcn{self.num_gcn_blocks-1}')(h_x, h_y, adj_mat)
+        # h_y = getattr(self, f'gcn{self.num_gcn_blocks-1}')(h_x, h_y, adj_mat)
         # h_x, h_y = torch.tanh(h_x), torch.tanh(h_y)
-        h_y = torch.tanh(h_y)
+        h_y = y_batch[..., -1:, :] + torch.tanh(self.decode_dst(h_y))
 
         # (4) relation 
         relation = gumbel_softmax(logits, self.tau, hard= True, dim= -1)
@@ -199,8 +196,8 @@ class CausalInferenceModel(nn.Module):
         res_label, exp_label = batch['res_label'].detach().cpu().numpy(), batch['exp_label'].detach().cpu().numpy()
 
         # r2 score
-        res_r2 = r2_score(res_preds.flatten(), res_label.flatten())
-        exp_r2 = r2_score(exp_preds.flatten(), exp_label.flatten())
+        res_r2 = r2_score(res_label.flatten(), res_preds.flatten())
+        exp_r2 = r2_score(exp_label.flatten(), exp_preds.flatten())
 
         # mse 
         res_mse = mean_squared_error(res_preds.flatten(), res_label.flatten())
