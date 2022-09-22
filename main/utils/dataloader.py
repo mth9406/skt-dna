@@ -91,6 +91,19 @@ def load_skt(args):
         'RRC_CNT','RRC_FAIL_RATE','CALL_RELEASE_ANOMALY_CNT',
         'DL_PRB', 'CQI','RSRP','RSRQ','UPLINK_SINR','UE_TX_POWER','TA' 
     ] 
+
+    # explanatory data columns
+    args.exp_columns = [
+        'RRC_CNT', 'DL_PRB', 'RSRP','RSRQ','UPLINK_SINR','UE_TX_POWER','TA'        
+    ]
+    args.num_src = len(args.exp_columns)
+
+    # target columns
+    args.target_columns = [
+        'CQI', 'CALL_RELEASE_ANOMALY_CNT', 'RRC_FAIL_RATE'
+    ]
+    args.num_dst = len(args.target_columns)
+
     # load
     try:            
         with open(args.cache_file, 'rb') as f:

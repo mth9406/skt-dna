@@ -350,9 +350,14 @@ def test_regr(args,
                     adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
                     # save the adj-matrix in csv format 
                     adj_mat.to_csv(os.path.join(graph_path, f'{enb_id}_graph_{j}.csv'))
-                    G = nx.from_pandas_adjacency(adj_mat, create_using=nx.DiGraph)
-                    G = nx.DiGraph(G)
-                    pos = nx.circular_layout(G)
+                    adj_mat = adj_mat[args.target_columns]
+                    row, col = np.nonzero(adj_mat.values)
+                    edges = [[i, j] for i,j in  zip(adj_mat.index[row], adj_mat.columns[col])]
+                    G = nx.DiGraph()
+                    G.add_nodes_from(args.exp_columns, bipartite=0)
+                    G.add_nodes_from(args.target_columns, bipartite= 1)
+                    G.add_edges_from(edges)                    
+                    pos = nx.drawing.layout.bipartite_layout(G, args.exp_columns)
                     nx.draw_networkx(G, pos=pos, **options)
                     plt.savefig(graph_file, format="PNG")
             plt.close('all')

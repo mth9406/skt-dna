@@ -58,7 +58,7 @@ class MTGNN(nn.Module):
         self.projection = ProjectionConv1x1Layer(num_heteros, num_heteros, groups= num_heteros, **kwargs)
         # hetero blocks
         for i in range(num_blocks): 
-            setattr(self, f'hetero_block{i}', HeteroBlock(num_heteros, k, **kwargs))
+            setattr(self, f'hetero_block{i}', HeteroBlock(num_heteros, k, num_ts, **kwargs))
         
         # hetero adjacency matrices
         self.ts_idx = torch.LongTensor(list(range(num_ts))).to(device) # to device...
@@ -292,7 +292,7 @@ class HeteroNRI(nn.Module):
         self.projection = ProjectionConv1x1Layer(num_heteros, num_heteros, groups= num_heteros, **kwargs)
         # hetero blocks
         for i in range(num_blocks): 
-            setattr(self, f'hetero_block{i}', HeteroBlock(num_heteros, k, **kwargs))
+            setattr(self, f'hetero_block{i}', HeteroBlock(num_heteros, k, num_ts, **kwargs))
 
         # output_module
         # self.fc_out = nn.Conv2d(num_heteros, num_heteros, (1, time_lags), padding= 0)
@@ -314,7 +314,7 @@ class HeteroNRI(nn.Module):
         )
             
         self.mask_block = nn.Sequential(
-            ResidualAdd(TemporalConvolutionModule(num_heteros, num_heteros, num_heteros)),
+            ResidualAdd(TemporalConvolutionModule(num_heteros, num_heteros, num_heteros, num_ts)),
             nn.Conv2d(num_heteros, num_heteros, kernel_size=(time_lags,1), groups= num_heteros)
         )
 
@@ -499,7 +499,7 @@ class HeteroSpatialNRI(nn.Module):
         self.projection = ProjectionConv1x1Layer(num_heteros, num_heteros, groups= num_heteros, **kwargs)
         # hetero blocks
         for i in range(num_blocks): 
-            setattr(self, f'hetero_block{i}', HeteroBlock(num_heteros, k, **kwargs))
+            setattr(self, f'hetero_block{i}', HeteroBlock(num_heteros, k, num_ts, **kwargs))
 
         # output_module
         # self.fc_out = nn.Conv2d(num_heteros, num_heteros, (1, time_lags), padding= 0)
