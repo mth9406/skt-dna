@@ -55,6 +55,8 @@ parser.add_argument('--verbose', action= 'store_true',
                 help= 'print logs about early-stopping')
 parser.add_argument('--train_ar', action= 'store_true', 
                 help= 'train autoregressive predictions if set true')
+parser.add_argument('--train_online', action= 'store_true', 
+                help= 'train online if set true')
 
 # model options
 parser.add_argument('--model_path', type= str, default= './data/skt/model',
@@ -167,7 +169,10 @@ def main(args):
     # test the multi-step HeteroNRI (model) using test data 
     # fine tune the model every 'args.fine_tunning_every'
     # test the fine-tuned model using the next batch of the test dataset.
-    print('start online-learning')
+    if args.train_online:
+        print('start online-learning...')
+    else: 
+        print('start evaluating...')
     # record time elapsed of the fine-tunning 
     # the time should be less than 5 minutes...
 
@@ -204,47 +209,48 @@ def main(args):
             labels.append(x['label'].detach().cpu()) # bs, c, t, n
             if out['adj_mat'] is not None: 
                 graphs.append(out['adj_mat'].detach().cpu()) # bs, c, n, n or bs, n, n
-
-        model.train()
-        ts = time()
-        # feed forward
-        print(f'[Batch: {batch_idx+1} / {len(test_loader)}] online learning...')
-        for epoch in range(args.epoch_online):
-            with torch.set_grad_enabled(True):
-                out = model(x, args.beta)
-                mse_loss = criterion(out['outs_label'], x['label'])
-                if out['outs_mask'] is not None: 
-                    bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
-                    loss = mse_loss + bce_loss
-                else: 
-                    loss = mse_loss
-                if out['kl_loss'] is not None: 
-                    loss += args.kl_loss_penalty * out['kl_loss']
-                # if out['regularization_loss'] is not None: 
-                #     loss += args.reg_loss_penalty * out['regularization_loss']
-            # backward 
-            model.zero_grad()
-            optimizer.zero_grad()
-            loss.backward()
-            optimizer.step()
-        tf = time()
-        time_ellapsed.append(tf-ts)
-        print(f'[Batch: {batch_idx+1} / {len(test_loader)}] online learning done in {tf-ts:4f} sec')
+        
+        if args.train_online:
+            model.train()
+            ts = time()
+            # feed forward
+            print(f'[Batch: {batch_idx+1} / {len(test_loader)}] online learning...')
+            for epoch in range(args.epoch_online):
+                with torch.set_grad_enabled(True):
+                    out = model(x, args.beta)
+                    mse_loss = criterion(out['outs_label'], x['label'])
+                    if out['outs_mask'] is not None: 
+                        bce_loss = criterion_mask(out['outs_mask'], x['label_mask'])
+                        loss = mse_loss + bce_loss
+                    else: 
+                        loss = mse_loss
+                    if out['kl_loss'] is not None: 
+                        loss += args.kl_loss_penalty * out['kl_loss']
+                    # if out['regularization_loss'] is not None: 
+                    #     loss += args.reg_loss_penalty * out['regularization_loss']
+                # backward 
+                model.zero_grad()
+                optimizer.zero_grad()
+                loss.backward()
+                optimizer.step()
+            tf = time()
+            time_ellapsed.append(tf-ts)
+            print(f'[Batch: {batch_idx+1} / {len(test_loader)}] online learning done in {tf-ts:4f} sec')
 
     te_mse = np.array(te_mse)
     te_mae = np.array(te_mae)
     te_r2 = np.array(te_r2)
-    time_ellapsed = np.array(time_ellapsed)
+    time_ellapsed = np.array(time_ellapsed) if args.train_online else float('nan')
         
     te_mse_mean = np.average(te_mse, weights= weights)
     te_r2_mean  = np.average(te_r2, weights= weights)
     te_mae_mean  = np.average(te_mae, weights=weights)
-    time_ellapsed_mean  = np.average(time_ellapsed, weights=weights)
+    time_ellapsed_mean = np.average(time_ellapsed, weights=weights) if args.train_online else float('nan')
 
     te_mse_std = np.average((te_mse-te_mse_mean)**2, weights= weights)
     te_r2_std = np.average((te_r2-te_r2_mean)**2, weights= weights)
     te_mae_std = np.average((te_mae-te_mae_mean)**2, weights= weights)
-    time_ellapsed_std = np.average((time_ellapsed-time_ellapsed_mean)**2, weights=weights)
+    time_ellapsed_std = np.average((time_ellapsed-time_ellapsed_mean)**2, weights=weights) if args.train_online else float('nan')
 
     perf = {
         'r2': [te_r2_mean],
@@ -256,6 +262,8 @@ def main(args):
         'mean_fine_tunning_time': [time_ellapsed_mean],
         'std_fine_tunning_time': [time_ellapsed_std]
     }
+
+    print(perf)
 
     if args.save_results: 
         
