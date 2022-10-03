@@ -419,7 +419,11 @@ class HeteroNRIMulti(nn.Module):
         kl_loss = kl_loss + out['kl_loss'] if out['kl_loss'] is not None else None 
 
         for t in range(1, self.pred_steps): 
-            ar_x_batch, ar_mask_batch = torch.cat((x_batch[..., t:, :], outs_label[..., :t, :]), dim= -2), torch.cat((mask_batch[..., t:, :], outs_mask[..., :t, :]), dim= -2)
+            if self.training:
+                # teacher-forcing 
+                ar_x_batch, ar_mask_batch = torch.cat((x_batch[..., t:, :], x['label'][..., :t, :]), dim= -2), torch.cat((mask_batch[..., t:, :], x['label_mask'][..., :t, :]), dim= -2)
+            else:
+                ar_x_batch, ar_mask_batch = torch.cat((x_batch[..., t:, :], outs_label[..., :t, :]), dim= -2), torch.cat((mask_batch[..., t:, :], outs_mask[..., :t, :]), dim= -2)
             ar_x = {
                 'input': ar_x_batch,
                 'mask': ar_mask_batch
