@@ -176,7 +176,8 @@ def main(args):
     # record time elapsed of the fine-tunning 
     # the time should be less than 5 minutes...
 
-    te_mse = []; te_r2 = []; te_mae= []
+    te_mse = [[] for _ in range(args.pred_steps)]; te_r2 = [[] for _ in range(args.pred_steps)]; 
+    te_mae= [[] for _ in range(args.pred_steps)]
     weights = []
     time_ellapsed = []
 
@@ -196,12 +197,13 @@ def main(args):
         model.eval() 
         with torch.no_grad():
             out = model(x, args.beta)
-            preds = out['preds'].detach().cpu().numpy().flatten()
-            label = x['label'].detach().cpu().numpy().flatten()
+            preds = out['preds'].detach().cpu().numpy()
+            label = x['label'].detach().cpu().numpy()
 
-            te_mse.append(mean_squared_error(label, preds))
-            te_mae.append(mean_absolute_error(label, preds))
-            te_r2.append(r2_score(label, preds))
+            for t in range(args.pred_steps):
+                te_mse[t].append(mean_squared_error(label[...,t,:].flatten(), preds[...,t,:].flatten()))
+                te_mae[t].append(mean_absolute_error(label[...,t,:].flatten(), preds[...,t,:].flatten()))
+                te_r2[t].append(r2_score(label[...,t,:].flatten(), preds[...,t,:].flatten()))
             weights.append(len(out['preds']))
 
             # record labels and predictions 
@@ -241,27 +243,27 @@ def main(args):
     te_mae = np.array(te_mae)
     te_r2 = np.array(te_r2)
     time_ellapsed = np.array(time_ellapsed) if args.train_online else float('nan')
-        
-    te_mse_mean = np.average(te_mse, weights= weights)
-    te_r2_mean  = np.average(te_r2, weights= weights)
-    te_mae_mean  = np.average(te_mae, weights=weights)
+   
+    te_mse_mean = np.average(te_mse, weights= weights, axis= 1)
+    te_r2_mean  = np.average(te_r2, weights= weights, axis= 1)
+    te_mae_mean  = np.average(te_mae, weights=weights, axis= 1)
     time_ellapsed_mean = np.average(time_ellapsed, weights=weights) if args.train_online else float('nan')
 
-    te_mse_std = np.average((te_mse-te_mse_mean)**2, weights= weights)
-    te_r2_std = np.average((te_r2-te_r2_mean)**2, weights= weights)
-    te_mae_std = np.average((te_mae-te_mae_mean)**2, weights= weights)
-    time_ellapsed_std = np.average((time_ellapsed-time_ellapsed_mean)**2, weights=weights) if args.train_online else float('nan')
-
-    perf = {
-        'r2': [te_r2_mean],
-        'mae': [te_mae_mean],
-        'mse': [te_mse_mean],
-        'r2_std': [te_r2_std],
-        'mae_std': [te_mae_std],
-        'mse_std': [te_mse_std],
-        'mean_fine_tunning_time': [time_ellapsed_mean],
-        'std_fine_tunning_time': [time_ellapsed_std]
-    }
+    te_mse_std = np.average((te_mse-te_mse_mean[:, np.newaxis])**2, weights= weights, axis= 1)
+    te_r2_std = np.average((te_r2-te_r2_mean[:, np.newaxis])**2, weights= weights, axis= 1)
+    te_mae_std = np.average((te_mae-te_mae_mean[:, np.newaxis])**2, weights= weights, axis= 1)
+    time_ellapsed_std = np.average((time_ellapsed-time_ellapsed_mean[:, np.newaxis])**2, weights=weights) if args.train_online else float('nan')
+    
+    perf = {}
+    for t in range(args.pred_steps):
+        perf[f'r2_{t}'] = [te_r2_mean[t]]
+        perf[f'mae_{t}'] = [te_mae_mean[t]]
+        perf[f'mse_{t}'] = [te_mse_mean[t]]
+        perf[f'r2_std_{t}'] = [te_r2_std[t]]
+        perf[f'mae_std_{t}'] = [te_mae_std[t]]
+        perf[f'te_mse_std_{t}'] = [te_mse_std[t]]
+    perf['mean_fine_tunning_time'] = [time_ellapsed_mean]
+    perf['std_fine_tunning_time'] = [time_ellapsed_std]
 
     print(perf)
 
