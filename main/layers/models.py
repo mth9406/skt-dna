@@ -446,6 +446,145 @@ class HeteroNRIMulti(nn.Module):
             'adj_mat': adj_mats            
         }
 
+class MTGNNMulti(nn.Module): 
+    r"""Multivariate Time Series Forecasting with Graph Neural Networks 
+    
+    This work is heavily based on the work by 
+    
+    \"""
+    Connecting the dots: multivariate time series forecasting with graph neural networks 
+
+    Wu, Z., Pan, S., Long, G., Jiang, J., Chang, X., & Zhang, C. (2020, August). 
+    Connecting the dots: Multivariate time series forecasting with graph neural networks. 
+    In Proceedings of the 26th ACM SIGKDD international conference on knowledge discovery & data mining (pp. 753-763).
+    \"""
+
+    but predicts multi-step auto-regressive way 
+    so that it does not change the pretrained structure.
+    """
+
+    def __init__(self, backbone, pred_steps, device):
+        super().__init__() 
+        self.backbone = backbone 
+        self.device= device
+
+        self.pred_steps = pred_steps
+
+    def forward(self, x, beta): 
+        return self.auto_regressive_forward(x, beta)     
+
+    def auto_regressive_forward(self, x, beta): 
+        x_batch, mask_batch = x['input'], x['mask']
+        bs, c, n, d = x_batch.shape
+        outs = torch.zeros((bs, c, self.pred_steps, d), requires_grad= False, device= self.device)
+
+        out = self.backbone.forward(x, beta)
+        outs[...,0:1,:] = out['preds']
+
+        for t in range(1, self.pred_steps): 
+            if self.training:
+                # teacher-forcing 
+                ar_x_batch = torch.cat((x_batch[..., t:, :], x['label'][..., :t, :]), dim= -2)
+            else:
+                ar_x_batch = torch.cat((x_batch[..., t:, :], out[..., :t, :]), dim= -2)
+            ar_x = {
+                'input': ar_x_batch,
+                'mask': None
+            }
+            out = self.backbone.forward(ar_x, beta)
+            outs[...,t:t+1,:] = out['preds']
+
+        return {
+            'preds': outs, 
+            'outs_label': outs, 
+            'outs_mask': None, 
+            'kl_loss': None, 
+            'adj_mat': None           
+        }
+
+class NRIMulti(nn.Module): 
+    r"""
+    
+    This work is based on the work by 
+    
+    \"""
+    Kipf, T., Fetaya, E., Wang, K. C., Welling, M., & Zemel, R. (2018, July). 
+    Neural relational inference for interacting systems. 
+    In International Conference on Machine Learning (pp. 2688-2697). PMLR.
+    \"""
+
+    # Arguments 
+    ___________
+    num_heteros : int 
+        the number of heterogeneous groups (stack along the channel dimension)
+    num_ts : int
+        the number of time-series 
+        should be 10 for the skt-data
+    time_lags : int 
+        the size of 'time_lags'
+    tau: float 
+        softmax temperature - a parameter that controls the smoothness of the samples       
+    kwargs : key word arguments
+        * groups
+        * drop_p 
+        * ...
+    """
+    def __init__(self, 
+                 num_heteros: int,
+                 num_time_series: int, 
+                 time_lags: int, 
+                 tau: float, 
+                 n_hid_encoder: int, 
+                 msg_hid: int, 
+                 msg_out: int, 
+                 n_hid_decoder: int,
+                 pred_steps: int,
+                 device,
+                 **kwargs
+                ):
+        super().__init__()
+
+        #edge weights have dim 2
+        self.encoder = MLPEncoder(time_lags * num_time_series, n_hid_encoder, 2)
+        self.decoder = MLPDecoder(n_in_node=num_time_series,
+                                edge_types=2,
+                                msg_hid=msg_hid,
+                                msg_out=msg_out,
+                                n_hid=n_hid_decoder)
+        self.rel_rec, self.rel_send = generate_off_diag(num_heteros, device= device)
+        
+        self.num_heteros = num_heteros
+        self.num_time_series = num_time_series
+        self.time_lags = time_lags 
+        self.tau = tau  
+        self.pred_steps = pred_steps
+        self.device= device
+
+    def forward(self, x, beta= None):
+        x_batch = x['input'] # bs, c, t, n
+
+        logits = self.encoder(x_batch, self.rel_rec, self.rel_send)
+        if self.training: 
+            edges = nri_gumbel_softmax(logits, self.tau, hard= False)
+        else: 
+            edges = nri_gumbel_softmax(logits, self.tau, hard= True)
+        prob = nri_softmax(logits, -1)
+        output = self.decoder(x_batch, edges, self.rel_rec, self.rel_send, self.time_lags)
+        kl_loss = kl_categorical_uniform(prob, self.num_heteros, 2)
+        # recon_loss = ((x_batch[:, :, 1:, :] - output[:, :, :-1, :]) ** 2).mean() 
+        _, rel = logits.max(-1)
+        A = []
+        for i in range(rel.shape[0]):
+            A.append(coo_to_adj(rel[i], self.num_heteros)) # bs, c, c 
+        A = torch.stack(A, dim= 0).to(self.device)
+        return {
+            'preds': output[:, :, -self.pred_steps:, :], 
+            'outs_label': output[:, :, -self.pred_steps:, :], 
+            'outs_mask': None, 
+            'kl_loss': -kl_loss, 
+            'adj_mat': A          
+        }
+
 class HeteroSpatialNRI(nn.Module): 
     r"""
     

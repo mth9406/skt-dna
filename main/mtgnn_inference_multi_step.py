@@ -37,8 +37,6 @@ parser.add_argument('--lag', type= int, default= 1,
                 help= 'time-lag (default: 1)')
 parser.add_argument('--cache_file', type= str, default= './data/cache.pickle', 
                 help= 'a cache file to min-max scale the data')
-parser.add_argument('--graph_time_range', type= int, default= 36, 
-                help= 'time-range to save a graph')
 
 # Training options
 parser.add_argument('--batch_size', type=int, default=32, help='input batch size')
@@ -89,7 +87,6 @@ with open(args_file, 'w') as f:
 
 def main(args): 
     # read data
-    # one of: gestures, physionet, mimic3
     print("Loading data...")
     if args.data_type == 'skt':
         # load gestures-data
@@ -116,33 +113,23 @@ def main(args):
     args.beta = backbone_model_option['beta']
 
     # backbone
-    backbone = HeteroNRI(
+    backbone = MTGNN(
         num_heteros= args.num_heteros,
         num_ts= args.num_ts,  
         time_lags= backbone_model_option['lag'], 
         num_blocks= backbone_model_option['num_blocks'], 
         k= backbone_model_option['k'], 
+        embedding_dim= backbone_model_option['embedding_dim'],
         device= device,
-        tau= backbone_model_option['tau'],           
+        alpha= backbone_model_option['alpha'],           
+        top_k= backbone_model_option['top_k']
     ).to(device)
     
     model_file = os.path.join(backbone_model_option['model_path'], backbone_model_option['model_file'])
     ckpt = torch.load(model_file)
     backbone.load_state_dict(ckpt['state_dict'])
-
-    # # freeze model parameters 
-    # # graph learning layers
-    # for param in backbone.glem.parameters():
-    #     param.requires_grad = False
-    # # projection layer
-    # for param in backbone.projection.parameters():
-    #     param.requires_grad = False
-    # # hetero blocks
-    # for i in range(backbone_model_option['num_blocks']): 
-    #     for param in getattr(backbone, f'hetero_block{i}').parameters():
-    #         param.requires_grad = False
             
-    model = HeteroNRIMulti(
+    model = MTGNNMulti(
         backbone= backbone,
         pred_steps= args.pred_steps,
         device= device
@@ -270,31 +257,9 @@ def main(args):
     if args.save_results: 
         
         print('saving the predictions...')
-        # make a path to save a graphs 
-        graph_path = os.path.join(args.model_path, 'test/graphs')
-        if not os.path.exists(graph_path):
-            print("Making a path to save graphs...")
-            print(f"{graph_path}")
-            os.makedirs(graph_path, exist_ok= True)
-        else:
-            print("The path to save graphs already exists, skip making the path...")
 
         predictions = torch.concat(predictions, dim=0) # num_obs, num_cells, preds_steps, num_time_series
-        labels = torch.concat(labels, dim=0) # num_obs, num_cells, preds_steps, num_time_series
-        graphs = torch.concat(graphs, dim=0) # num_obs, num_preds_steps, num_cells, num_time_series, num_time_series
-        graphs = torch.permute(graphs, (1, 2, 0, 3, 4)) # num_preds_steps, num_cells, num_obs, num_time_series, num_time_series
-        graphs = graphs.numpy()         
-
-        # graph-options
-        options = {
-                    'node_color': 'skyblue',
-                    'node_size': 3000,
-                    'width': 0.5 ,
-                    'arrowstyle': '-|>',
-                    'arrowsize': 20,
-                    'alpha' : 1,
-                    'font_size' : 15
-                }
+        labels = torch.concat(labels, dim=0) # num_obs, num_cells, preds_steps, num_time_series    
 
         for t in range(args.pred_steps):
             p = torch.permute(predictions[:,:,t, :], (1, 0, 2)) # num_cells, num_obs, num_time_series 
@@ -311,7 +276,6 @@ def main(args):
                 l = inv_min_max_scaler_ver2(l, args.cache, args.columns)
         
             # saving figures: predictions vs labels
-            # saving graphs 
             for i in tqdm(range(num_cells), total= num_cells):
                 enb_id = args.decoder.get(i)
                 write_csv(args, f'test/predictions_{t}_step', f'predictions_{enb_id}.csv', p[i, ...], args.columns)
@@ -338,24 +302,6 @@ def main(args):
                 #     print("The path to save figures already exists, skip making the path...")
                 fig_file = os.path.join(fig_path, f'figure_{enb_id}.png')
                 fig.savefig(fig_file)
-                plt.close('all')
-
-            for i in tqdm(range(num_cells), total= num_cells):
-                graph_path = os.path.join(args.model_path, f'test/graphs_{t}_step/{enb_id}')
-                os.makedirs(graph_path, exist_ok= True)
-                plt.figure(figsize =(15,15))
-                for j in range(args.graph_time_range):
-                    # num_obs, num_time_series, num_time_series
-                    graph_file = os.path.join(graph_path, f'{enb_id}_graph_{j}.png') 
-                    adj_mat = np.transpose(graphs[t, i, j, ...]) # num_time_series, num_time_series 
-                    adj_mat = pd.DataFrame(adj_mat, columns = args.columns, index= args.columns)
-                    # save the adj-matrix in csv format 
-                    adj_mat.to_csv(os.path.join(graph_path, f'{enb_id}_graph_{j}.csv'))
-                    G = nx.from_pandas_adjacency(adj_mat, create_using=nx.DiGraph)
-                    G = nx.DiGraph(G)
-                    pos = nx.circular_layout(G)
-                    nx.draw_networkx(G, pos=pos, **options)
-                    plt.savefig(graph_file, format="PNG")
                 plt.close('all')
 
     return perf
