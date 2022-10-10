@@ -1,4 +1,3 @@
-# args.exp_loss_penalty, args.kl_loss_penalty 추가하기
 import os 
 import sys 
 import json

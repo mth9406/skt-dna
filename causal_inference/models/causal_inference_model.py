@@ -143,7 +143,7 @@ class CausalInferenceModel(nn.Module):
         for i in range(1, self.num_blocks_dst):
             h_x_res = h_x 
             h_x = F.leaky_relu(getattr(self, f'tcm_src{i}')(h_x) + h_x_res) 
-        h_x = x_batch[...,-1:,:] + self.decode_src(h_x)
+        h_x = torch.tanh(x_batch[...,-1:,:] + self.decode_src(h_x))
 
         # (2.2) obtain representation of response variables 
         h_y = self.tcm_dst0(y_batch[..., :-1, :])
@@ -155,7 +155,7 @@ class CausalInferenceModel(nn.Module):
         for i in range(self.num_gcn_blocks): 
             h_y = getattr(self, f'gcn{i}')(h_x, h_y, adj_mat)
             h_y = F.leaky_relu(h_y) 
-        h_y = y_batch[..., -1:, :] + self.decode_dst(h_y)
+        h_y = torch.tanh(y_batch[..., -1:, :] + self.decode_dst(h_y))
 
         # (4) relation 
         relation = gumbel_softmax(logits, self.tau, hard= True, dim= -1)

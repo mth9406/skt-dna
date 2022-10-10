@@ -76,16 +76,90 @@ class CausalDilatedVerticalConv1d(nn.Module):
         x = x[..., :-self.causal_conv.padding[0], :] if self.pad > 0 else x
         return x
 
+class MultiVariateCausalDilatedLayer(nn.Module): 
+    r"""Multivariate- Dilated Inception Layer 
+    we propese a new convolution layer named "Multivariate Causal Dilated layer" 
+    """
+    def __init__(self, in_channels:int, out_channels:int, 
+                kernel_size:tuple, 
+                groups:int, dilation:int, 
+                num_time_series:int,
+                **kwargs): 
+        super().__init__() 
+
+        # layer
+        assert in_channels == out_channels, 'convolution for different input/output channels are not implemented yet'
+        self.causal_conv = CausalDilatedVerticalConv1d(num_time_series*in_channels, num_time_series*out_channels, kernel_size, groups, dilation, **kwargs)
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels 
+        self.kernel_size = kernel_size 
+        self.groups = groups 
+        self.dilation = dilation 
+        self.num_time_series = num_time_series
+
+    def forward(self, x): 
+        bs, c, t, d = x.shape
+        x = self.ravel(x) # raveled (bs, c*d, t, 1)
+        x = self.causal_conv(x) # raveled
+        x = self.unravel(x, c, d)
+        return x
+
+    def ravel(self, input):
+        bs, c, t, d = input.shape 
+        return torch.reshape(input.permute((0, 3, 1, 2)), (bs, c*d, t, 1))
+
+    def unravel(self, input, num_channels, num_time_series): 
+        bs, cd, t, _ = input.shape 
+        return torch.reshape(input.squeeze().transpose(-1,-2), (bs, num_channels, -1, num_time_series))
+
+class MultiVariateDecodeLayer(nn.Module): 
+    r"""Multivariate- Dilated Inception Layer 
+    we propese a new convolution layer named "Multivariate Causal Dilated layer 
+    """
+    def __init__(self, in_channels:int, out_channels:int, 
+                kernel_size:tuple, 
+                groups:int, dilation:int, 
+                num_time_series:int,
+                **kwargs): 
+        super().__init__() 
+
+        # layer
+        assert in_channels == out_channels, 'convolution for different input/output channels are not implemented yet'
+        self.causal_conv = CausalDilatedVerticalConv1d(num_time_series*in_channels, num_time_series*out_channels, kernel_size, groups, dilation, **kwargs)
+
+        self.in_channels = in_channels
+        self.out_channels = out_channels 
+        self.kernel_size = kernel_size 
+        self.groups = groups 
+        self.dilation = dilation 
+        self.num_time_series = num_time_series
+
+    def forward(self, x): 
+        bs, c, t, d = x.shape
+        x = self.ravel(x) # raveled
+        x = self.causal_conv(x) # raveled
+        x = self.unravel(x, c, d)
+        return x
+
+    def ravel(self, input):
+        bs, c, t, d = input.shape 
+        return torch.reshape(input.permute((0, 3, 1, 2)), (bs, c*d, t, 1))
+
+    def unravel(self, input, num_channels, num_time_series): 
+        bs, cd, t, _ = input.shape 
+        return torch.reshape(input.squeeze().transpose(-1,-2), (bs, num_channels, -1, num_time_series))
+
 # temporal convolution layer
 class DilatedInceptionLayer(nn.Module):
     r"""Dilated inception layer
     """
-    def __init__(self, in_channels, out_channels, **kwargs):
+    def __init__(self, in_channels, out_channels, num_time_series, **kwargs):
         super().__init__()
-        self.branch1x1 = CausalDilatedVerticalConv1d(in_channels, out_channels, (1,1), in_channels, 1, **kwargs)
-        self.branch3x1 = CausalDilatedVerticalConv1d(in_channels, out_channels, (3,1), in_channels, 1, **kwargs)
-        self.branch5x1 = CausalDilatedVerticalConv1d(in_channels, out_channels, (3,1), in_channels, 2, **kwargs)
-        self.branch7x1 = CausalDilatedVerticalConv1d(in_channels, out_channels, (3,1), in_channels, 3, **kwargs)
+        self.branch1x1 = MultiVariateCausalDilatedLayer(in_channels, out_channels, (1,1), in_channels, 1, num_time_series, **kwargs)
+        self.branch3x1 = MultiVariateCausalDilatedLayer(in_channels, out_channels, (3,1), in_channels, 1, num_time_series, **kwargs)
+        self.branch5x1 = MultiVariateCausalDilatedLayer(in_channels, out_channels, (3,1), in_channels, 2, num_time_series, **kwargs)
+        self.branch7x1 = MultiVariateCausalDilatedLayer(in_channels, out_channels, (3,1), in_channels, 3, num_time_series, **kwargs)
 
         self.in_channels, self.out_channels = in_channels, out_channels
 
@@ -98,15 +172,15 @@ class DilatedInceptionLayer(nn.Module):
             # we have c groups of receptive channels...
             # = 4 channels form one group.
         return outs
-
+    
 class TemporalConvolutionModule(nn.Module): 
     r"""TemporalConvolutionModule
     """
-    def __init__(self, in_channels, out_channels, num_heteros, **kwargs): 
+    def __init__(self, in_channels, out_channels, num_heteros, num_time_series, **kwargs): 
         super().__init__()
-        self.dil_filter = DilatedInceptionLayer(in_channels, out_channels, **kwargs)
-        self.dil_gate = DilatedInceptionLayer(in_channels, out_channels, **kwargs) 
-        self.conv_inter = nn.Conv2d(4*in_channels, in_channels, 1, groups= num_heteros, **kwargs)
+        self.dil_filter = DilatedInceptionLayer(in_channels, out_channels, num_time_series, **kwargs)
+        self.dil_gate = DilatedInceptionLayer(in_channels, out_channels, num_time_series, **kwargs) 
+        self.conv_inter = MultiVariateCausalDilatedLayer(in_channels, out_channels, (1,1), num_heteros, 1, num_time_series)
         self.in_channels, self.out_channels = in_channels, out_channels  
         self.num_heteros = num_heteros
 
