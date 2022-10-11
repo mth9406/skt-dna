@@ -63,6 +63,8 @@ class CausalInferenceModel(nn.Module):
                 num_src: int,  
                 num_dst: int, 
                 time_lags: int, 
+                num_ts:int,
+                num_ts_y:int, 
                 num_blocks_src:int=8, 
                 num_blocks_dst:int=8,
                 num_gcn_blocks:int=3, 
@@ -75,7 +77,7 @@ class CausalInferenceModel(nn.Module):
         # encoder layers
         # tcm_src: To learn the representation of explanatory variables 
         for i in range(num_blocks_src): 
-            setattr(self, f'tcm_src{i}', TemporalConvolutionModule(num_heteros, num_heteros, num_heteros))
+            setattr(self, f'tcm_src{i}', TemporalConvolutionModule(num_heteros, num_heteros, num_heteros, num_ts))
         self.decode_src = nn.Sequential(
             ResidualAdd(nn.Sequential(
             nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, groups= num_heteros, padding= 0), 
@@ -84,13 +86,13 @@ class CausalInferenceModel(nn.Module):
             nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, padding= 0)
             )),
             nn.LeakyReLU(negative_slope= 0.5),
-            nn.Conv2d(num_heteros, num_heteros, (time_lags-1, 1), groups= num_heteros),
-            nn.Tanh()
+            nn.Conv2d(num_heteros, num_heteros, (time_lags, 1), groups= num_heteros)
+            # nn.Tanh()
         )
             
         # tcm_dst: To learn the representation of response (target) variables 
         for i in range(num_blocks_dst): 
-            setattr(self, f'tcm_dst{i}', TemporalConvolutionModule(num_heteros, num_heteros, num_heteros))
+            setattr(self, f'tcm_dst{i}', TemporalConvolutionModule(num_heteros, num_heteros, num_heteros, num_ts_y))
         self.decode_dst = nn.Sequential(
             ResidualAdd(nn.Sequential(
             nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, groups= num_heteros, padding= 0), 
@@ -99,13 +101,13 @@ class CausalInferenceModel(nn.Module):
             nn.Conv2d(num_heteros, num_heteros, kernel_size= 1, padding= 0)
             )),
             nn.LeakyReLU(negative_slope= 0.5),
-            nn.Conv2d(num_heteros, num_heteros, (time_lags-1, 1), groups= num_heteros),
-            nn.Tanh()
+            nn.Conv2d(num_heteros, num_heteros, (time_lags, 1), groups= num_heteros)
+            # nn.Tanh()
         )
         
         # graph sampling layer
-        self.glem = GraphLearningEncoderModule(num_heteros, time_lags, num_src, num_dst, device)
-        self.reconstruct_src = nn.Conv2d(num_heteros, num_heteros, kernel_size= (1,1), groups= num_heteros, padding= 0, bias= False)
+        self.glem = GraphLearningEncoderModule(num_heteros, time_lags, num_src, num_dst, num_src, device)
+        self.reconstruct_src = nn.Conv2d(num_heteros, num_heteros, kernel_size= (1,1), groups= num_heteros, padding= 0)
         
         # graph convolution layers
         for i in range(num_gcn_blocks): 
@@ -139,14 +141,14 @@ class CausalInferenceModel(nn.Module):
         adj_mat = gumbel_softmax(logits, self.tau, hard= False, dim= -1)
         
         # (2.1) obtain representation of explanatory variables
-        h_x = self.tcm_src0(x_batch[..., :-1, :])
+        h_x = self.tcm_src0(x_batch)
         for i in range(1, self.num_blocks_dst):
             h_x_res = h_x 
             h_x = F.leaky_relu(getattr(self, f'tcm_src{i}')(h_x) + h_x_res) 
-        h_x = torch.tanh(x_batch[...,-1:,:] + self.decode_src(h_x))
+        h_x = torch.tanh(self.decode_src(h_x))
 
         # (2.2) obtain representation of response variables 
-        h_y = self.tcm_dst0(y_batch[..., :-1, :])
+        h_y = self.tcm_dst0(y_batch)
         for i in range(1, self.num_blocks_src):
             h_y_res = h_y 
             h_y = F.leaky_relu(getattr(self, f'tcm_dst{i}')(h_y) +  h_y_res) 
@@ -155,7 +157,7 @@ class CausalInferenceModel(nn.Module):
         for i in range(self.num_gcn_blocks): 
             h_y = getattr(self, f'gcn{i}')(h_x, h_y, adj_mat)
             h_y = F.leaky_relu(h_y) 
-        h_y = torch.tanh(y_batch[..., -1:, :] + self.decode_dst(h_y))
+        h_y = torch.tanh(self.decode_dst(h_y))
 
         # (4) relation 
         relation = gumbel_softmax(logits, self.tau, hard= True, dim= -1)

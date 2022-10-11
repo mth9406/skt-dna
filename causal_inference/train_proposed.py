@@ -124,6 +124,8 @@ def main(args):
         num_src = args.num_src,
         num_dst = args.num_dst, 
         time_lags = args.lag, 
+        num_ts= args.num_ts,
+        num_ts_y= args.num_ts_y,
         num_blocks_src = args.num_blocks_src, 
         num_blocks_dst = args.num_blocks_dst,
         num_gcn_blocks = args.num_gcn_blocks, 

@@ -180,7 +180,7 @@ class TemporalConvolutionModule(nn.Module):
         super().__init__()
         self.dil_filter = DilatedInceptionLayer(in_channels, out_channels, num_time_series, **kwargs)
         self.dil_gate = DilatedInceptionLayer(in_channels, out_channels, num_time_series, **kwargs) 
-        self.conv_inter = MultiVariateCausalDilatedLayer(in_channels, out_channels, (1,1), num_heteros, 1, num_time_series)
+        self.conv_inter = nn.Conv2d(4*in_channels, in_channels, 1, groups= num_heteros, **kwargs)
         self.in_channels, self.out_channels = in_channels, out_channels  
         self.num_heteros = num_heteros
 

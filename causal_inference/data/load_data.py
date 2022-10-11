@@ -107,6 +107,7 @@ def load_skt(args):
 
     args.num_heteros = num_heteros
     args.num_ts = num_ts 
+    args.num_ts_y = num_ts_Y
 
     print(f'the shape of X       : ({num_heteros}, {num_obs}, {num_ts})')
     print(f'the shape of Y       : ({num_heteros_Y}, {num_obs_Y}, {num_ts_Y})')

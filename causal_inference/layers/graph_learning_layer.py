@@ -48,7 +48,7 @@ class GraphLearningEncoder(nn.Module):
     returns adjacency matrix (logits) for every item in a batch
 
     """
-    def __init__(self, num_heteros:int, time_lags:int, 
+    def __init__(self, num_heteros:int, time_lags:int, num_ts:int,
                 device= torch.device('cuda' if torch.cuda.is_available() else 'cpu'), 
                 **kwargs): 
         super().__init__() 
@@ -56,7 +56,7 @@ class GraphLearningEncoder(nn.Module):
         self.time_lags = time_lags
         self.device = device
         self.tcm = nn.Sequential(
-            TemporalConvolutionModule(num_heteros, num_heteros, num_heteros=num_heteros, **kwargs),
+            TemporalConvolutionModule(num_heteros, num_heteros, num_heteros=num_heteros, num_time_series=num_ts, **kwargs),
             nn.Conv2d(num_heteros, num_heteros, (time_lags-1, 1), groups= num_heteros)) 
         self.node2edge_conv = nn.Conv2d(num_heteros, num_heteros, (1, 2), groups= num_heteros)
         self.edge2src_node_conv = nn.Conv2d(num_heteros, num_heteros, (1, 1), groups= num_heteros)
@@ -105,13 +105,13 @@ class GraphLearningEncoderModule(nn.Module):
 
     """
 
-    def __init__(self, num_heteros, time_lags, num_src, num_dst, 
+    def __init__(self, num_heteros, time_lags, num_src, num_dst, num_ts,
                 device= torch.device('cuda' if torch.cuda.is_available() else 'cpu'), 
                 **kwargs): 
         super().__init__()
 
         self.src, self.dst = generate_bipartite(num_src, num_dst, device= device)
-        self.gle = GraphLearningEncoder(num_heteros, time_lags, device= device, **kwargs) 
+        self.gle = GraphLearningEncoder(num_heteros, time_lags, num_ts, device= device, **kwargs) 
         self.num_heteros, self.time_lags, self.num_src, self.num_dst = num_heteros, time_lags, num_src, num_dst
 
     def forward(self, x, y): 
