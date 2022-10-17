@@ -15,6 +15,7 @@ from torch.utils.data import DataLoader
 from utils.utils import * 
 from utils.torchUtils import *
 from layers.models import *
+from layers.ablation_models import * 
 from utils.dataloader import * 
 
 parser = argparse.ArgumentParser()
@@ -170,6 +171,22 @@ def main(args):
             k= args.k, 
             tau= args.tau,
             device= device
+        ).to(device)
+    elif args.model_type == 'ccm':
+        model = CCM(
+            num_heteros= args.num_heteros,
+            num_ts = args.num_ts, 
+            time_lags = args.lag, 
+            num_blocks = args.num_blocks,   
+            device= device         
+        ).to(device)
+    elif args.model_type == 'hccm':
+        model = HCCM(
+            num_heteros= args.num_heteros,
+            num_ts = args.num_ts, 
+            time_lags = args.lag, 
+            num_blocks = args.num_blocks,   
+            device= device         
         ).to(device)
     else:
         print("The model is yet to be implemented.")

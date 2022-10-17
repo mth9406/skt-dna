@@ -467,7 +467,7 @@ class MTGNNMulti(nn.Module):
         super().__init__() 
         self.backbone = backbone 
         self.device= device
-
+        # self.output = nn.Conv2d... -> 3 time steps..
         self.pred_steps = pred_steps
 
     def forward(self, x, beta): 
