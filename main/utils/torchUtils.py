@@ -176,7 +176,8 @@ def train(args,
         n = len(logs['tr_loss'])
         rows = np.array(list(logs.values())).T
         wr.writerow(list(logs.keys()))
-        for i in range(1, n):
+        #for i in range(1, n):
+        for i in range(n):   #이렇게 해야 첫 epoch결과도 저장함.
             wr.writerow(rows[i, :])
 
 def test_regr(args, 
