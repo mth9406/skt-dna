@@ -49,7 +49,7 @@ class CausalDilatedVerticalConv1d(nn.Module):
     Wavenet: A generative model for raw audio. 
     arXiv preprint arXiv:1609.03499.
     \"""
-    This module only defers from the original work inthat 
+    This module only differs from the original work inthat 
     (1) it is a group-wise convolution 
     (2) the kernel 'moves' vertically.
     """
@@ -114,8 +114,7 @@ class MultiVariateCausalDilatedLayer(nn.Module):
         return torch.reshape(input.squeeze().transpose(-1,-2), (bs, num_channels, -1, num_time_series))
 
 class MultiVariateDecodeLayer(nn.Module): 
-    r"""Multivariate- Dilated Inception Layer 
-    we propese a new convolution layer named "Multivariate Causal Dilated layer 
+    r"""MultiVariateDecodeLayer
     """
     def __init__(self, in_channels:int, out_channels:int, 
                 kernel_size:tuple, 

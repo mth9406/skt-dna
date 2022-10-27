@@ -27,12 +27,13 @@ class Trainer:
                     batch[key] = batch[key].to(device)
                 model.train()
                 # feed forward
-                with torch.set_grad_enabled(True):
-                    tr_loss = model.train_step(batch, args.exp_loss_penalty, args.kl_loss_penalty)
-                    model.zero_grad()
-                    optimizer.zero_grad()
-                    tr_loss['total_loss'].backward()
-                    optimizer.step() 
+                with torch.autograd.set_detect_anomaly(True):
+                    with torch.set_grad_enabled(True):
+                        tr_loss = model.train_step(batch, args.exp_loss_penalty, args.kl_loss_penalty)
+                        model.zero_grad()
+                        optimizer.zero_grad()
+                        tr_loss['total_loss'].backward()
+                        optimizer.step() 
 
             # a validation loop 
             for batch_idx, batch in enumerate(valid_loader):

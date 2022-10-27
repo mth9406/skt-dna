@@ -107,7 +107,7 @@ class CausalInferenceModel(nn.Module):
         
         # graph sampling layer
         self.glem = GraphLearningEncoderModule(num_heteros, time_lags, num_src, num_dst, num_src, device)
-        self.reconstruct_src = nn.Conv2d(num_heteros, num_heteros, kernel_size= (1,1), groups= num_heteros, padding= 0)
+        # self.reconstruct_src = nn.Conv2d(num_heteros, num_heteros, kernel_size= (1,1), groups= num_heteros, padding= 0)
         
         # graph convolution layers
         for i in range(num_gcn_blocks): 
@@ -138,6 +138,7 @@ class CausalInferenceModel(nn.Module):
 
         # (1) graph sampling 
         logits = self.glem(x_batch, y_batch) # bs, c, num_src, num_dst 
+        probs = F.softmax(logits, dim=-1)
         adj_mat = gumbel_softmax(logits, self.tau, hard= False, dim= -1)
         
         # (2.1) obtain representation of explanatory variables
@@ -166,6 +167,7 @@ class CausalInferenceModel(nn.Module):
             'res_label': h_y,
             'exp_label': h_x, 
             'logits': logits,
+            'probs': probs,
             'adj_mat': adj_mat,
             'relation': relation
         }
@@ -175,7 +177,7 @@ class CausalInferenceModel(nn.Module):
         out = self.forward(batch)
         label_loss = self.criterion(out['exp_label'], batch['exp_label'])
         exp_loss = self.criterion(out['res_label'], batch['res_label'])
-        probs = F.softmax(out['logits'], dim= -1) # bs, c, num_src, num_ts
+        probs = out['probs'] # bs, c, num_src, num_ts
         kl_loss = kl_categorical_uniform(probs, self.num_heteros * self.num_dst * self.num_src) 
         total_loss =  label_loss + exp_loss_penalty * exp_loss + kl_loss_penalty * kl_loss
         
@@ -192,8 +194,8 @@ class CausalInferenceModel(nn.Module):
         out = self.forward(batch)
         label_loss = torch.mean((out['res_label'] - batch['res_label'])**2)
         exp_loss = torch.mean(out['exp_label']- batch['exp_label']**2)
-        probs = F.softmax(out['logits'], dim= -1)
-        kl_loss = kl_categorical_uniform(probs, self.num_dst*self.num_src) 
+        probs = out['probs'] # bs, c, num_src, num_ts
+        kl_loss = kl_categorical_uniform(probs, self.num_heteros * self.num_dst * self.num_src) 
         total_loss =  label_loss + exp_loss_penalty * exp_loss + kl_loss_penalty * kl_loss
 
         return {
@@ -207,7 +209,7 @@ class CausalInferenceModel(nn.Module):
     def test_step(self, batch):
 
         out = self.forward(batch)
-        probs = F.softmax(out['logits'], dim= -1)
+        probs = out['probs'] # bs, c, num_src, num_ts
         kl_loss = kl_categorical_uniform(probs, self.num_dst*self.num_src) 
 
         res_preds, exp_preds = out['res_label'].detach().cpu().numpy(), out['exp_label'].detach().cpu().numpy()
