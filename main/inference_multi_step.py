@@ -341,6 +341,7 @@ def main(args):
                 plt.close('all')
 
             for i in tqdm(range(num_cells), total= num_cells):
+                enb_id = args.decoder.get(i)
                 graph_path = os.path.join(args.model_path, f'test/graphs_{t}_step/{enb_id}')
                 os.makedirs(graph_path, exist_ok= True)
                 plt.figure(figsize =(15,15))

@@ -469,9 +469,38 @@ class MTGNNMulti(nn.Module):
         self.device= device
         # self.output = nn.Conv2d... -> 3 time steps..
         self.pred_steps = pred_steps
-
+        self.fc_out = nn.Sequential(
+            nn.Conv2d(self.backbone.num_heteros, self.backbone.num_heteros, kernel_size=(self.backbone.time_lags-self.pred_steps+1, 1), padding=0),
+            nn.Tanh()
+        )
     def forward(self, x, beta): 
-        return self.auto_regressive_forward(x, beta)     
+        # x_batch = make_input_n_mask_pairs(x, self.device)
+        x_batch, mask_batch = x['input'], x['mask']
+        x_batch = self.backbone.projection(x_batch) # bs, c (=num_heteros), t, n 
+        bs, c, t, n = x_batch.shape
+        A = torch.stack([gll(self.backbone.ts_idx) for gll in self.backbone.gen_adj]).to(self.device) # c, n, n 
+        outs_label = torch.zeros((bs, c * (self.backbone.num_blocks+2), t, n)).to(self.device) # to collect outputs from modules
+        out = x_batch.clone().detach()
+        outs_label[:, ::(self.backbone.num_blocks+2), ...] = out
+        for i in range(self.backbone.num_blocks): 
+            tc_out, out = getattr(self.backbone, f'hetero_block{i}')(out, A, beta)
+            # x_batch += tc_out 
+            outs_label[:, (i+1)::(self.backbone.num_blocks+2), ...] = tc_out
+            # x_batch = torch.cat([x_batch, tc_out], dim= 1)
+        # x_batch += out # bs, c, n, l 
+        outs_label[:, (self.backbone.num_blocks+1)::(self.backbone.num_blocks+2), ...] = out
+
+        # x_batch = torch.cat([x_batch, out], dim=1)
+        outs_label = self.backbone.fc_decode(outs_label)
+        outs_label = self.fc_out(outs_label) 
+        
+        return {
+            'preds': outs_label, 
+            'outs_label': outs_label, 
+            'outs_mask': None,
+            'kl_loss': None, 
+            'adj_mat': None
+        }  
 
     def auto_regressive_forward(self, x, beta): 
         x_batch, mask_batch = x['input'], x['mask']
@@ -569,7 +598,7 @@ class NRIMulti(nn.Module):
         else: 
             edges = nri_gumbel_softmax(logits, self.tau, hard= True)
         prob = nri_softmax(logits, -1)
-        output = self.decoder(x_batch, edges, self.rel_rec, self.rel_send, self.time_lags)
+        output = self.decoder(x_batch, edges, self.rel_rec, self.rel_send, self.pred_steps)
         kl_loss = kl_categorical_uniform(prob, self.num_heteros, 2)
         # recon_loss = ((x_batch[:, :, 1:, :] - output[:, :, :-1, :]) ** 2).mean() 
         _, rel = logits.max(-1)
@@ -578,8 +607,8 @@ class NRIMulti(nn.Module):
             A.append(coo_to_adj(rel[i], self.num_heteros)) # bs, c, c 
         A = torch.stack(A, dim= 0).to(self.device)
         return {
-            'preds': output[:, :, -self.pred_steps:, :], 
-            'outs_label': output[:, :, -self.pred_steps:, :], 
+            'preds': output, 
+            'outs_label': output, 
             'outs_mask': None, 
             'kl_loss': -kl_loss, 
             'adj_mat': A          

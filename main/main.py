@@ -188,6 +188,16 @@ def main(args):
             num_blocks = args.num_blocks,   
             device= device         
         ).to(device)
+    elif args.model_type == 'heteroNRINoGroup':
+        model = HeteroNRINoGroup(
+            num_heteros= args.num_heteros,
+            num_ts= args.num_ts,  
+            time_lags= args.lag, 
+            num_blocks= args.num_blocks, 
+            k= args.k, 
+            device= device,
+            tau= args.tau,           
+        ).to(device)        
     else:
         print("The model is yet to be implemented.")
         sys.exit()

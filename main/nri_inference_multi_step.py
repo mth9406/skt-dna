@@ -71,6 +71,8 @@ parser.add_argument('--beta', type= float , default= 0.5,
                 help= 'parameter used in the GraphConvolutionModule, must be in the interval [0,1] (default= 0.5)')
 parser.add_argument('--model_name', type= str, default= 'latest_checkpoint(online).pth.tar'
                     ,help= 'model name to save', required= False)
+parser.add_argument('--tau', type= float, default= 1., 
+                help= 'smoothing parameter used in the Gumbel-Softmax, only used in the model: heteroNRI')
 parser.add_argument('--n_hid_encoder', type = int, default= 256, 
                 help= 'dimension of a hidden vector in the nri-encoder')
 parser.add_argument('--msg_hid', type= int, default= 256, 
@@ -127,12 +129,11 @@ def main(args):
         num_heteros= args.num_heteros,
         num_time_series= args.num_ts,  
         time_lags= args.lag,  
-        device= device,
         tau= args.tau,  
         n_hid_encoder= args.n_hid_encoder,
         msg_hid = args.msg_hid,
         msg_out = args.msg_out,
-        n_hid_decoder = args.n_hid_decoder,       
+        n_hid_decoder = args.n_hid_decoder,    
         pred_steps= args.pred_steps,
         device= device
     ).to(device)
